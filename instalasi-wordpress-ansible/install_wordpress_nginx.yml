@@ -15,10 +15,8 @@
     php_fpm_sock: /run/php-fpm/www.sock
 
   tasks:
-    - name: Pastikan semua paket sistem ter-update
+    - name: Update cache paket dnf
       ansible.builtin.dnf:
-        name: "*"
-        state: latest
         update_cache: yes
 
     - name: Instal paket yang dibutuhkan
@@ -62,6 +60,7 @@
         host: "localhost"
         state: present
         login_unix_socket: /var/lib/mysql/mysql.sock
+        column_case_sensitive: false
 
     - name: Pastikan direktori web root ada
       ansible.builtin.file:
@@ -71,23 +70,44 @@
         group: nginx
         mode: '0755'
 
+    - name: Cek apakah WordPress sudah terinstal
+      ansible.builtin.stat:
+        path: "{{ wp_root }}/wp-includes/version.php"
+      register: wp_version_file
+
+    - name: Validasi instalasi WordPress jika ada
+      ansible.builtin.stat:
+        path: "{{ wp_root }}/{{ item }}"
+      register: wp_core_files
+      loop:
+        - wp-load.php
+        - wp-settings.php
+        - index.php
+      when: wp_version_file.stat.exists
+
+    - name: Tentukan apakah perlu install ulang WordPress
+      ansible.builtin.set_fact:
+        wp_needs_install: "{{ not wp_version_file.stat.exists or (wp_core_files.results | default([]) | selectattr('stat.exists', 'equalto', false) | list | length > 0) }}"
+
     - name: Unduh WordPress terbaru
       ansible.builtin.get_url:
         url: https://wordpress.org/latest.zip
         dest: /tmp/latest.zip
         mode: '0644'
+      when: wp_needs_install | bool
 
     - name: Kosongkan direktori sementara (jika ada)
       ansible.builtin.file:
         path: /tmp/wordpress_extract
         state: absent
-      ignore_errors: yes
+      when: wp_needs_install | bool
 
     - name: Buat direktori sementara untuk ekstraksi
       ansible.builtin.file:
         path: /tmp/wordpress_extract
         state: directory
         mode: '0755'
+      when: wp_needs_install | bool
 
     - name: Ekstrak WordPress ke direktori sementara
       ansible.builtin.unarchive:
@@ -95,6 +115,7 @@
         dest: /tmp/wordpress_extract
         remote_src: yes
         extra_opts: [ "-o" ]
+      when: wp_needs_install | bool
 
     - name: Salin file WordPress ke direktori web root
       ansible.builtin.copy:
@@ -104,11 +125,13 @@
         group: nginx
         mode: '0755'
         remote_src: yes
+      when: wp_needs_install | bool
 
     - name: Bersihkan direktori sementara
       ansible.builtin.file:
         path: /tmp/wordpress_extract
         state: absent
+      when: wp_needs_install | bool
 
     - name: Buat file konfigurasi PHP-FPM agar berjalan dengan Nginx
       ansible.builtin.lineinfile:
@@ -175,6 +198,71 @@
       ansible.builtin.command:
         cmd: chcon -R -t httpd_sys_rw_content_t {{ wp_root }}
       changed_when: false
+
+    - name: Cek apakah wp-config.php sudah ada
+      ansible.builtin.stat:
+        path: "{{ wp_root }}/wp-config.php"
+      register: wp_config_file
+
+    - name: Validasi wp-config.php jika ada
+      ansible.builtin.shell:
+        cmd: "grep -q \"define('DB_NAME'\" {{ wp_root }}/wp-config.php && grep -q \"AUTH_KEY\" {{ wp_root }}/wp-config.php"
+      register: wp_config_valid
+      failed_when: false
+      changed_when: false
+      when: wp_config_file.stat.exists
+
+    - name: Fetch WordPress salt keys
+      ansible.builtin.uri:
+        url: https://api.wordpress.org/secret-key/1.1/salt/
+        return_content: yes
+      register: wp_salt_keys
+      delegate_to: localhost
+      become: false
+      when: not wp_config_file.stat.exists or (wp_config_file.stat.exists and wp_config_valid.rc != 0)
+
+    - name: Deploy wp-config.php dari template
+      ansible.builtin.template:
+        src: templates/wp-config.php.j2
+        dest: "{{ wp_root }}/wp-config.php"
+        owner: nginx
+        group: nginx
+        mode: '0644'
+      when: not wp_config_file.stat.exists or (wp_config_file.stat.exists and wp_config_valid.rc != 0)
+
+    - name: Install WP-CLI
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+        dest: /usr/local/bin/wp
+        mode: '0755'
+
+    - name: Verifikasi apakah WordPress sudah terinstal
+      ansible.builtin.command:
+        cmd: /usr/local/bin/wp core is-installed --path={{ wp_root }} --allow-root
+      register: wp_installed
+      failed_when: false
+      changed_when: false
+
+    - name: Install WordPress via WP-CLI
+      ansible.builtin.command:
+        cmd: >
+          /usr/local/bin/wp core install
+          --url=http://{{ server_name }}
+          --title="{{ wp_site_title }}"
+          --admin_user={{ wp_admin_user }}
+          --admin_password={{ wp_admin_password }}
+          --admin_email={{ wp_admin_email }}
+          --path={{ wp_root }}
+          --allow-root
+      when: wp_installed.rc != 0
+
+    - name: Set ownership dan permission final untuk WordPress
+      ansible.builtin.file:
+        path: "{{ wp_root }}"
+        owner: nginx
+        group: nginx
+        recurse: yes
+        state: directory
 
     - name: Install python3-firewall library (required by firewalld module)
       ansible.builtin.dnf:
