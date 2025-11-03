@@ -1,117 +1,104 @@
-# 🚀 DigitalOcean HAProxy & Database Cluster (100% Droplet)
+# 🚀 DigitalOcean, AWS, & GCP HAProxy Cluster
 
 ## 📖 Deskripsi Proyek
 
-Proyek ini menggunakan **Terraform** untuk menyediakan arsitektur aplikasi web berdaya tahan tinggi (High Availability/HA) di DigitalOcean. Topologi ini dirancang dengan isolasi jaringan maksimum menggunakan **Virtual Private Cloud (VPC)**, memastikan hanya Load Balancer yang terekspos ke publik.
+Proyek ini menyediakan arsitektur aplikasi web berdaya tahan tinggi (High Availability/HA) menggunakan **Terraform** di tiga penyedia *cloud* berbeda: **DigitalOcean**, **Amazon Web Services (AWS)**, dan **Google Cloud Platform (GCP)**.
 
-### **Spesifikasi Topologi:**
+Tujuan utamanya adalah merealisasikan topologi berikut menggunakan **Droplet/VM (Virtual Machine)** untuk semua komponen, memastikan isolasi jaringan, dan hanya mengekspos Load Balancer ke publik.
+
+### **Topologi Inti**
 
 | Komponen | Jumlah | Role | Eksposur IP |
 | :--- | :--- | :--- | :--- |
-| **Load Balancer** | 1 Droplet | HAProxy (Titik masuk publik) | **Publik & Privat** |
-| **Aplikasi Web** | 3 Droplet | Node Web Server (Nginx) | Hanya **Privat** (VPC) |
-| **Database** | 2 Droplet | Primary & Secondary (Replikasi Manual) | Hanya **Privat** (VPC) |
-
-
-```mermaid
-graph TD
-    A[Pengguna/Internet] --> B(Load Balancer);
-    subgraph Lapisan Aplikasi
-        B --> C{Web App 1};
-        B --> D{Web App 2};
-        B --> E{Web App 3};
-    end
-    subgraph Lapisan Database
-        C --> F[DB Primary];
-        D --> F;
-        E --> F;
-        F -- Replikasi Asinkron/Sinkron --> G[DB Secondary];
-    end
-```
+| **Load Balancer** | 1 Droplet/VM | HAProxy (Titik masuk publik) | **Publik & Privat** |
+| **Aplikasi Web** | 3 Droplet/VM | Node Web Server (Nginx) | Hanya **Privat** (VPC/VPC Network) |
+| **Database** | 2 Droplet/VM | Primary & Secondary (Replikasi Manual) | Hanya **Privat** (VPC/VPC Network) |
 
 -----
 
-## 🔒 Arsitektur Jaringan (VPC)
+## 💾 Struktur Proyek
 
-Semua komunikasi internal (Load Balancer ke Aplikasi, Aplikasi ke Database) dilakukan melalui **IP Privat** di dalam DigitalOcean VPC. Hal ini secara signifikan meningkatkan keamanan karena node aplikasi dan database tidak dapat diakses langsung dari internet.
+Proyek ini memiliki tiga file konfigurasi Terraform yang terpisah, masing-masing spesifik untuk satu *cloud provider*:
 
-| Komponen | Koneksi Masuk | Koneksi Keluar |
+| File Terraform | Cloud Provider | Keterangan |
 | :--- | :--- | :--- |
-| **Pengguna** | $\rightarrow$ HAProxy (Port 80 Publik) | N/A |
-| **HAProxy** | $\rightarrow$ Web App Node (Port 80 Privat) | $\leftarrow$ Web App Node (Port 80 Privat) |
-| **Web App Node** | $\rightarrow$ DB Primary (Port DB Privat) | $\leftarrow$ DB Primary (Port DB Privat) |
+| `main.tf` | **DigitalOcean** | Menggunakan **Droplet** dan **VPC** DigitalOcean. |
+| `main-aws.tf` | **AWS** | Menggunakan **EC2**, **VPC**, **Subnet**, dan **Security Groups**. |
+| `main-gcp.tf` | **GCP** | Menggunakan **Compute Engine**, **VPC Network**, dan **Firewall Rules**. |
 
 -----
 
-## ⚙️ Persyaratan
+## ⚙️ Persyaratan dan Pra-Syarat
 
-Sebelum menjalankan skrip Terraform ini, pastikan Anda memiliki:
+Pastikan Anda memiliki:
 
 1.  **Terraform CLI** terinstal.
-2.  **DigitalOcean API Token.** Token ini harus diekspor sebagai *environment variable*:
-    ```bash
-    export DIGITALOCEAN_TOKEN="YOUR_DO_TOKEN"
-    ```
-3.  **Kunci SSH** publik (`~/.ssh/id_rsa.pub`) di mesin lokal Anda (atau sesuaikan jalurnya di `main.tf`).
+2.  **Kunci SSH** publik (`~/.ssh/id_rsa.pub`) di mesin lokal Anda (atau sesuaikan jalurnya di setiap skrip).
+3.  Kredensial API yang sesuai untuk *provider* yang ingin Anda *deploy*:
 
------
-
-## 💾 File Konfigurasi (`main.tf`)
-
-File utama Terraform (`main.tf`) berisi langkah-langkah provisi berikut:
-
-1.  **digitalocean\_vpc.private\_network**: Membuat jaringan pribadi yang aman untuk semua sumber daya.
-2.  **digitalocean\_ssh\_key.default**: Mengunggah kunci SSH untuk akses ke Droplet.
-3.  **digitalocean\_droplet.database\_node** (count = 2): Membuat dua Droplet DB (Primary & Secondary). Mereka hanya memiliki IP Privat dan merupakan target untuk replikasi database (konfigurasi replikasi harus dilakukan secara manual setelah *deployment*).
-4.  **digitalocean\_droplet.web\_app** (count = 3): Membuat tiga Droplet aplikasi web. Hanya memiliki IP Privat dan menjalankan Nginx sederhana melalui `user_data`. Mereka dikonfigurasi untuk mengarahkan permintaan database ke IP Privat Primary DB.
-5.  **digitalocean\_droplet.haproxy\_lb**: Droplet Load Balancer. Ini adalah satu-satunya Droplet yang memiliki IP Publik. `user_data` di sini menginstal dan mengkonfigurasi **HAProxy** untuk menyeimbangkan beban lalu lintas HTTP (Port 80) ke IP Privat ketiga node aplikasi web menggunakan algoritma **Round Robin**.
+| Cloud Provider | Variabel Lingkungan / Kredensial |
+| :--- | :--- |
+| **DigitalOcean** | `export DIGITALOCEAN_TOKEN="YOUR_DO_TOKEN"` |
+| **AWS** | `export AWS_ACCESS_KEY_ID="..."` dan `export AWS_SECRET_ACCESS_KEY="..."` |
+| **GCP** | File Kunci Akun Layanan (`service account key file`) dan setel `gcloud auth application-default login` atau konfigurasi kredensial. Jangan lupa ganti `project` ID di `main-gcp.tf`. |
 
 -----
 
 ## 🛠️ Cara Menggunakan
 
+Untuk setiap *provider*, ikuti langkah-langkah berikut:
+
 ### 1. Inisialisasi
 
-Masuk ke direktori yang berisi `main.tf` dan inisialisasi *provider* DigitalOcean:
+Pilih file yang ingin Anda gunakan dan salin ke direktori kerja Anda (atau gunakan nama file yang sama).
 
 ```bash
+# Contoh: Untuk DigitalOcean
 terraform init
 ```
 
+*(Ulangi langkah ini jika Anda berpindah ke direktori atau file provider lain.)*
+
 ### 2. Rencana dan Terapkan
 
-Tinjau rencana eksekusi untuk memastikan sumber daya yang dibuat sudah benar:
+Periksa rencana eksekusi dan terapkan konfigurasi:
 
 ```bash
-terraform plan
-```
-
-Jika rencana sudah sesuai, terapkan konfigurasi:
-
-```bash
+terraform plan -var-file="vars-example.tfvars" # Gunakan jika Anda menggunakan variabel
 terraform apply
 ```
 
-Ketik `yes` untuk mengonfirmasi.
+**Catatan Khusus:**
+
+  * **AWS:** Pastikan Anda telah mengganti `your-key-pair-name` dan `ami-id` di `main-aws.tf` dengan nilai yang valid untuk *region* Anda.
+  * **GCP:** Pastikan `project = "your-gcp-project-id"` di `main-gcp.tf` telah diganti.
 
 ### 3. Akses
 
-Setelah proses `apply` selesai, Terraform akan mencetak alamat IP Publik dari HAProxy Load Balancer:
+Setelah `apply` selesai, Terraform akan menampilkan IP Publik dari Load Balancer:
 
-```
-Outputs:
-
-haproxy_public_ip = "XXX.XXX.XXX.XXX"
-```
-
-Akses aplikasi Anda melalui alamat IP publik tersebut di *browser* Anda. Setiap kali Anda memuat ulang, HAProxy akan mengarahkan Anda ke node aplikasi yang berbeda.
+| Cloud Provider | Output Utama |
+| :--- | :--- |
+| **DigitalOcean** | `haproxy_public_ip` |
+| **AWS** | `haproxy_public_ip_aws` |
+| **GCP** | `haproxy_public_ip_gcp` |
 
 ### 4. Pembersihan
 
-Untuk menghapus semua sumber daya yang dibuat dan menghindari biaya berkelanjutan, jalankan:
+Untuk menghapus semua sumber daya yang dibuat, jalankan:
 
 ```bash
 terraform destroy
 ```
 
-Ketik `yes` untuk mengonfirmasi penghapusan.
+-----
+
+## 📝 Catatan Penting Mengenai Isolasi
+
+Semua skrip mengandalkan fitur jaringan pribadi *cloud provider* untuk memastikan node Aplikasi Web dan Database terisolasi:
+
+  * **DigitalOcean:** Menggunakan **VPC** tanpa `access_config` publik pada node internal.
+  * **AWS:** Menggunakan **Private Subnet** dan **Security Groups** untuk membatasi lalu lintas hanya dari Load Balancer dan antar node internal.
+  * **GCP:** Menggunakan **VPC Network** dan **Firewall Rules** yang menargetkan VM berdasarkan *tags*, memastikan Port 80 dari internet hanya terbuka pada VM HAProxy.
+
+Semua komunikasi internal (misalnya, aplikasi ke database) menggunakan **IP Privat** masing-masing VM/EC2/Droplet.
