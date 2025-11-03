@@ -1,8 +1,7 @@
 ---
-- name: Install and configure WordPress with Nginx on RHEL 9
+- name: Install WordPress with Nginx, PHP-FPM, and MariaDB on RHEL 9
   hosts: webservers
-  become: yes
-
+  become: true
   vars:
     wp_db_name: wordpress
     wp_db_user: wpuser
@@ -13,132 +12,135 @@
     wp_admin_password: Ellipse-Props-Chop7
     wp_admin_email: admin@yopmail.com
     wp_site_title: "My WordPress Site"
+    php_fpm_sock: /run/php-fpm/www.sock
 
   tasks:
-    - name: Update all packages
+    - name: Pastikan semua paket sistem ter-update
       ansible.builtin.dnf:
         name: "*"
         state: latest
+        update_cache: yes
 
-    - name: Install base utilities
+    - name: Instal paket yang dibutuhkan
       ansible.builtin.dnf:
         name:
-          - wget
-          - curl
-          - unzip
-          - nano
-        state: present
-
-    - name: Install Nginx
-      ansible.builtin.dnf:
-        name: nginx
-        state: present
-
-    - name: Enable and start Nginx
-      ansible.builtin.systemd:
-        name: nginx
-        enabled: yes
-        state: started
-
-    - name: Install PHP and required extensions
-      ansible.builtin.dnf:
-        name:
+          - nginx
+          - mariadb-server
           - php
-          - php-fpm
           - php-mysqlnd
+          - php-fpm
           - php-json
           - php-gd
-          - php-xml
-          - php-mbstring
-          - php-curl
+          - php-cli
           - php-zip
-          - php-intl
+          - php-mbstring
+          - unzip
+          - policycoreutils-python-utils
         state: present
 
-    - name: Configure PHP-FPM to run as nginx
-      ansible.builtin.replace:
-        path: /etc/php-fpm.d/www.conf
-        regexp: '^user = .*'
-        replace: 'user = nginx'
-      notify: restart php-fpm
-
-    - name: Configure PHP-FPM group
-      ansible.builtin.replace:
-        path: /etc/php-fpm.d/www.conf
-        regexp: '^group = .*'
-        replace: 'group = nginx'
-      notify: restart php-fpm
-
-    - name: Enable and start PHP-FPM
+    - name: Aktifkan dan jalankan layanan
       ansible.builtin.systemd:
-        name: php-fpm
-        enabled: yes
+        name: "{{ item }}"
+        enabled: true
         state: started
+      loop:
+        - nginx
+        - mariadb
+        - php-fpm
 
-    - name: Install MariaDB server
-      ansible.builtin.dnf:
-        name: mariadb-server
-        state: present
-
-    - name: Enable and start MariaDB
-      ansible.builtin.systemd:
-        name: mariadb
-        enabled: yes
-        state: started
-
-    - name: Create WordPress database
+    - name: Pastikan database WordPress ada (via socket auth)
       community.mysql.mysql_db:
         name: "{{ wp_db_name }}"
         state: present
+        login_unix_socket: /var/lib/mysql/mysql.sock
 
-    - name: Create WordPress user and grant privileges
+    - name: Pastikan user WordPress ada (via socket auth)
       community.mysql.mysql_user:
         name: "{{ wp_db_user }}"
         password: "{{ wp_db_password }}"
         priv: "{{ wp_db_name }}.*:ALL"
-        host: localhost
+        host: "localhost"
         state: present
+        login_unix_socket: /var/lib/mysql/mysql.sock
 
-    - name: Download latest WordPress
+    - name: Pastikan direktori web root ada
+      ansible.builtin.file:
+        path: "{{ wp_root }}"
+        state: directory
+        owner: nginx
+        group: nginx
+        mode: '0755'
+
+    - name: Unduh WordPress terbaru
       ansible.builtin.get_url:
         url: https://wordpress.org/latest.zip
         dest: /tmp/latest.zip
+        mode: '0644'
 
-    - name: Extract WordPress
+    - name: Kosongkan direktori sementara (jika ada)
+      ansible.builtin.file:
+        path: /tmp/wordpress_extract
+        state: absent
+      ignore_errors: yes
+
+    - name: Buat direktori sementara untuk ekstraksi
+      ansible.builtin.file:
+        path: /tmp/wordpress_extract
+        state: directory
+        mode: '0755'
+
+    - name: Ekstrak WordPress ke direktori sementara
       ansible.builtin.unarchive:
         src: /tmp/latest.zip
-        dest: "{{ wp_root }}"
+        dest: /tmp/wordpress_extract
         remote_src: yes
-        extra_opts: [--strip-components=1]
+        extra_opts: [ "-o" ]
 
-    - name: Set ownership and permissions
+    - name: Salin file WordPress ke direktori web root
+      ansible.builtin.copy:
+        src: /tmp/wordpress_extract/wordpress/
+        dest: "{{ wp_root }}/"
+        owner: nginx
+        group: nginx
+        mode: '0755'
+        remote_src: yes
+
+    - name: Bersihkan direktori sementara
       ansible.builtin.file:
-        path: "{{ wp_root }}"
-        owner: nginx
-        group: nginx
-        mode: "0755"
-        recurse: yes
+        path: /tmp/wordpress_extract
+        state: absent
 
-    - name: Create wp-config.php
-      ansible.builtin.template:
-        src: wp-config.php.j2
-        dest: "{{ wp_root }}/wp-config.php"
-        owner: nginx
-        group: nginx
-        mode: "0644"
+    - name: Buat file konfigurasi PHP-FPM agar berjalan dengan Nginx
+      ansible.builtin.lineinfile:
+        path: /etc/php-fpm.d/www.conf
+        regexp: '^;?listen\.owner'
+        line: 'listen.owner = nginx'
 
-    - name: Create Nginx config for WordPress
+    - name: Pastikan PHP-FPM listen socket diset ke Unix socket
+      ansible.builtin.lineinfile:
+        path: /etc/php-fpm.d/www.conf
+        regexp: '^listen ='
+        line: "listen = {{ php_fpm_sock }}"
+
+    - name: Restart PHP-FPM agar perubahan diterapkan
+      ansible.builtin.systemd:
+        name: php-fpm
+        state: restarted
+
+    - name: Hapus konfigurasi default bawaan Nginx
+      ansible.builtin.file:
+        path: /etc/nginx/conf.d/default.conf
+        state: absent
+
+    - name: Buat konfigurasi Nginx untuk WordPress
       ansible.builtin.copy:
         dest: /etc/nginx/conf.d/wordpress.conf
         content: |
           server {
-              listen 80;
-              server_name {{ server_name }};
-              root {{ wp_root }};
-              index index.php index.html index.htm;
-
-              access_log /var/log/nginx/wordpress_access.log;
-              error_log  /var/log/nginx/wordpress_error.log;
+              listen       80;
+              server_name  _;
+              root         {{ wp_root }};
+              index index.php index.html;
 
               location / {
                   try_files $uri $uri/ /index.php?$args;
@@ -146,61 +148,76 @@
 
               location ~ \.php$ {
                   include fastcgi_params;
-                  fastcgi_pass unix:/run/php-fpm/www.sock;
+                  fastcgi_pass unix:{{ php_fpm_sock }};
                   fastcgi_index index.php;
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
               }
 
-              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
                   expires max;
                   log_not_found off;
               }
           }
-      notify: restart nginx
 
-    - name: Allow HTTP/HTTPS through firewalld
-      ansible.posix.firewalld:
-        service: "{{ item }}"
-        permanent: true
-        state: enabled
-      loop:
-        - http
-        - https
-      notify: reload firewalld
-
-    - name: Install wp-cli (WordPress CLI)
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-        dest: /usr/local/bin/wp
-        mode: '0755'
-
-    - name: Configure WordPress site automatically
+    - name: Tes konfigurasi Nginx
       ansible.builtin.command:
-        cmd: >
-          wp core install
-          --path={{ wp_root }}
-          --url=http://{{ server_name }}
-          --title="{{ wp_site_title }}"
-          --admin_user={{ wp_admin_user }}
-          --admin_password={{ wp_admin_password }}
-          --admin_email={{ wp_admin_email }}
-        chdir: "{{ wp_root }}"
-      environment:
-        PATH: /usr/local/bin:/usr/bin:/bin
-      args:
-        creates: "{{ wp_root }}/wp-config.php"
+        cmd: nginx -t
+      register: nginx_test
+      failed_when: "'successful' not in nginx_test.stderr"
+      changed_when: false
 
-  handlers:
-    - name: restart nginx
+    - name: Restart Nginx
       ansible.builtin.systemd:
         name: nginx
         state: restarted
 
-    - name: restart php-fpm
-      ansible.builtin.systemd:
-        name: php-fpm
-        state: restarted
+    - name: Set SELinux agar Nginx dapat mengakses file WordPress
+      ansible.builtin.command:
+        cmd: chcon -R -t httpd_sys_rw_content_t {{ wp_root }}
+      changed_when: false
 
+    - name: Install python3-firewall library (required by firewalld module)
+      ansible.builtin.dnf:
+        name: python3-firewall
+        state: present
+
+    # ---------------------------------------
+    # Perbaikan firewalld
+    # ---------------------------------------
+    - name: Pastikan firewalld dan dependensinya terpasang
+      ansible.builtin.dnf:
+        name:
+          - firewalld
+          - python3-firewall
+        state: present
+
+    - name: Pastikan firewalld aktif dan berjalan
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+        state: started
+
+    - name: Tunggu sampai firewalld siap menerima perintah
+      ansible.builtin.command: firewall-cmd --state
+      register: fw_state
+      retries: 5
+      delay: 2
+      until: fw_state.rc == 0
+      changed_when: false
+
+
+    - name: Open HTTP and HTTPS ports
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - 80/tcp
+        - 443/tcp
+      become: true
+
+  handlers:
     - name: reload firewalld
       ansible.builtin.systemd:
         name: firewalld

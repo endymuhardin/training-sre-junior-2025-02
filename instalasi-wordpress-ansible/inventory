@@ -1,2 +1,2 @@
 [webservers]
-165.22.59.114 ansible_user=root ansible_become=true
+165.22.59.114 ansible_user=root ansible_become=true ansible_python_interpreter=/usr/bin/python3
