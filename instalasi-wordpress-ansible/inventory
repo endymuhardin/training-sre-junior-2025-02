@@ -1,0 +1,2 @@
+[webservers]
+165.22.59.114 ansible_user=root ansible_become=true

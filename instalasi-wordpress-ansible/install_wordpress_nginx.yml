@@ -1,0 +1,207 @@
+---
+- name: Install and configure WordPress with Nginx on RHEL 9
+  hosts: webservers
+  become: yes
+
+  vars:
+    wp_db_name: wordpress
+    wp_db_user: wpuser
+    wp_db_password: Tributary-Imprudent-Overdrawn6
+    wp_root: /usr/share/nginx/html
+    server_name: 165.22.59.114  # Ganti dengan domain/IP
+    wp_admin_user: admin
+    wp_admin_password: Ellipse-Props-Chop7
+    wp_admin_email: admin@yopmail.com
+    wp_site_title: "My WordPress Site"
+
+  tasks:
+    - name: Update all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+
+    - name: Install base utilities
+      ansible.builtin.dnf:
+        name:
+          - wget
+          - curl
+          - unzip
+          - nano
+        state: present
+
+    - name: Install Nginx
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+
+    - name: Enable and start Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: yes
+        state: started
+
+    - name: Install PHP and required extensions
+      ansible.builtin.dnf:
+        name:
+          - php
+          - php-fpm
+          - php-mysqlnd
+          - php-json
+          - php-gd
+          - php-xml
+          - php-mbstring
+          - php-curl
+          - php-zip
+          - php-intl
+        state: present
+
+    - name: Configure PHP-FPM to run as nginx
+      ansible.builtin.replace:
+        path: /etc/php-fpm.d/www.conf
+        regexp: '^user = .*'
+        replace: 'user = nginx'
+      notify: restart php-fpm
+
+    - name: Configure PHP-FPM group
+      ansible.builtin.replace:
+        path: /etc/php-fpm.d/www.conf
+        regexp: '^group = .*'
+        replace: 'group = nginx'
+      notify: restart php-fpm
+
+    - name: Enable and start PHP-FPM
+      ansible.builtin.systemd:
+        name: php-fpm
+        enabled: yes
+        state: started
+
+    - name: Install MariaDB server
+      ansible.builtin.dnf:
+        name: mariadb-server
+        state: present
+
+    - name: Enable and start MariaDB
+      ansible.builtin.systemd:
+        name: mariadb
+        enabled: yes
+        state: started
+
+    - name: Create WordPress database
+      community.mysql.mysql_db:
+        name: "{{ wp_db_name }}"
+        state: present
+
+    - name: Create WordPress user and grant privileges
+      community.mysql.mysql_user:
+        name: "{{ wp_db_user }}"
+        password: "{{ wp_db_password }}"
+        priv: "{{ wp_db_name }}.*:ALL"
+        host: localhost
+        state: present
+
+    - name: Download latest WordPress
+      ansible.builtin.get_url:
+        url: https://wordpress.org/latest.zip
+        dest: /tmp/latest.zip
+
+    - name: Extract WordPress
+      ansible.builtin.unarchive:
+        src: /tmp/latest.zip
+        dest: "{{ wp_root }}"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Set ownership and permissions
+      ansible.builtin.file:
+        path: "{{ wp_root }}"
+        owner: nginx
+        group: nginx
+        mode: "0755"
+        recurse: yes
+
+    - name: Create wp-config.php
+      ansible.builtin.template:
+        src: wp-config.php.j2
+        dest: "{{ wp_root }}/wp-config.php"
+        owner: nginx
+        group: nginx
+        mode: "0644"
+
+    - name: Create Nginx config for WordPress
+      ansible.builtin.copy:
+        dest: /etc/nginx/conf.d/wordpress.conf
+        content: |
+          server {
+              listen 80;
+              server_name {{ server_name }};
+              root {{ wp_root }};
+              index index.php index.html index.htm;
+
+              access_log /var/log/nginx/wordpress_access.log;
+              error_log  /var/log/nginx/wordpress_error.log;
+
+              location / {
+                  try_files $uri $uri/ /index.php?$args;
+              }
+
+              location ~ \.php$ {
+                  include fastcgi_params;
+                  fastcgi_pass unix:/run/php-fpm/www.sock;
+                  fastcgi_index index.php;
+                  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              }
+
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                  expires max;
+                  log_not_found off;
+              }
+          }
+      notify: restart nginx
+
+    - name: Allow HTTP/HTTPS through firewalld
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop:
+        - http
+        - https
+      notify: reload firewalld
+
+    - name: Install wp-cli (WordPress CLI)
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+        dest: /usr/local/bin/wp
+        mode: '0755'
+
+    - name: Configure WordPress site automatically
+      ansible.builtin.command:
+        cmd: >
+          wp core install
+          --path={{ wp_root }}
+          --url=http://{{ server_name }}
+          --title="{{ wp_site_title }}"
+          --admin_user={{ wp_admin_user }}
+          --admin_password={{ wp_admin_password }}
+          --admin_email={{ wp_admin_email }}
+        chdir: "{{ wp_root }}"
+      environment:
+        PATH: /usr/local/bin:/usr/bin:/bin
+      args:
+        creates: "{{ wp_root }}/wp-config.php"
+
+  handlers:
+    - name: restart nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+
+    - name: restart php-fpm
+      ansible.builtin.systemd:
+        name: php-fpm
+        state: restarted
+
+    - name: reload firewalld
+      ansible.builtin.systemd:
+        name: firewalld
+        state: reloaded
