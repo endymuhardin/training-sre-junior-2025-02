@@ -6,9 +6,7 @@ from collections import defaultdict
 def get_day_of_week_name(date_str):
     """Mengubah string tanggal menjadi nama hari (Senin, Selasa, dst.) dalam Bahasa Indonesia."""
     try:
-        # Format log: YYYY-MM-DD
         date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d')
-        # date_obj.weekday() mengembalikan 0=Senin, 6=Minggu
         days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
         return days[date_obj.weekday()]
     except ValueError:
@@ -21,11 +19,8 @@ def analyze_log_data(log_content):
     success_entries = 0
     operation_counts = defaultdict(lambda: {'total': 0, 'success': 0})
     error_types = defaultdict(int)
-    
-    # Penghitung baru untuk analisis harian
     daily_error_stats = defaultdict(lambda: {'total': 0, 'errors': 0})
 
-    # Regex untuk memecah baris log
     log_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} \[(SUCCESS|ERROR)\] (?:ATM\d+ )?([A-Z_]+)(?:.*?)?$')
     
     for line in log_content.strip().split('\n'):
@@ -55,7 +50,7 @@ def analyze_log_data(log_content):
         else: # ERROR
             daily_error_stats[day_name]['errors'] += 1
             
-            # Logika untuk Per-Operation dan Error Breakdown (Sama seperti sebelumnya)
+            # Logika untuk Per-Operation dan Error Breakdown
             if detail in ['TRANSFER', 'WITHDRAW', 'BALANCE']:
                 op = detail
             elif detail == 'CONNECTION_LOST':
@@ -79,73 +74,86 @@ def analyze_log_data(log_content):
             
     return total_entries, success_entries, operation_counts, error_types, daily_error_stats
 
-# --- Fungsi untuk membuat laporan ---
-def generate_report(file_name, total, success, op_counts, error_types, daily_stats):
-    """Mencetak laporan SLI yang terstruktur."""
+# --- Fungsi untuk membuat laporan dalam format MARKDOWN ---
+def generate_markdown_report(file_name, total, success, op_counts, error_types, daily_stats):
+    """Mencetak laporan SLI dalam format Markdown yang kompatibel dengan GitHub."""
     
-    # ... (Bagian Ketersediaan Global dan Per-Operasi sama seperti sebelumnya) ...
-    print("=" * 60)
-    print(f"       LAPORAN SLI DARI FILE: {file_name}")
-    print("=" * 60)
+    report = []
+    
+    # Header
+    report.append(f"# Laporan SLI dari File: `{file_name}`")
+    report.append("\n---\n")
 
     # 1. Ketersediaan Global (Overall Availability)
-    print("## 📊 Ketersediaan Transaksi Global")
-    print("-" * 45)
+    report.append("## 📊 Ketersediaan Transaksi Global")
+    
     success_rate = (success / total * 100) if total > 0 else 0
     error_rate = 100 - success_rate
-    print(f"Total Entri Log: {total}")
-    print(f"Total Transaksi Berhasil: {success}")
-    print(f"Total Transaksi Gagal (Error): {total - success}")
-    print(f"SLI 1: Overall Success Rate: **{success_rate:.2f}%**")
-    print("-" * 45)
-
-    # 2. Analisis Error Berdasarkan Hari (Fitur Baru)
-    print("\n## 📅 Analisis Error Berdasarkan Hari (Pencarian Pola)")
-    print("-" * 50)
     
-    # Urutan hari yang benar
+    report.append(f"* Total Entri Log: **{total}**")
+    report.append(f"* Total Transaksi Berhasil: **{success}**")
+    report.append(f"* Total Transaksi Gagal (Error): **{total - success}**")
+    report.append(f"* SLI 1: Overall Success Rate: **{success_rate:.2f}%**")
+    report.append(f"* Overall Error Rate: **{error_rate:.2f}%**")
+    
+    report.append("\n---\n")
+
+    # 2. Analisis Error Berdasarkan Hari (Tabel Markdown)
+    report.append("## 📅 Analisis Error Berdasarkan Hari")
+    
     day_order = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
     
-    print(f"{'Hari':<10} | {'Total Transaksi':<15} | {'Total Error':<11} | {'Error Rate (Harian)'}")
-    print("-" * 50)
+    # Header Tabel
+    report.append("| Hari | Total Transaksi | Total Error | Error Rate (Harian) |")
+    report.append("| :--- | :-------------: | :---------: | :-----------------: |")
     
     for day in day_order:
         stats = daily_stats.get(day)
         if stats and stats['total'] > 0:
             daily_rate = (stats['errors'] / stats['total'] * 100)
-            print(f"{day:<10} | {stats['total']:<15} | {stats['errors']:<11} | **{daily_rate:.2f}%**")
+            # Isi Baris Tabel
+            report.append(f"| {day} | {stats['total']} | {stats['errors']} | **{daily_rate:.2f}%** |")
         else:
-            print(f"{day:<10} | {0:<15} | {0:<11} | 0.00%")
+            report.append(f"| {day} | 0 | 0 | 0.00% |")
             
-    print("-" * 50)
+    report.append("\n")
 
-    # 3. Ketersediaan Per-Operasi (Sama seperti sebelumnya)
-    print("\n## 📈 Success Rate Berdasarkan Jenis Operasi")
-    print("-" * 45)
-    print(f"{'Operasi':<15} | {'Total':<8} | {'Success Rate':<15}")
-    print("-" * 45)
+    # 3. Ketersediaan Per-Operasi (Tabel Markdown)
+    report.append("## 📈 Success Rate Berdasarkan Jenis Operasi")
+    
+    # Header Tabel
+    report.append("| Operasi | Total | Success Rate |")
+    report.append("| :--- | :---: | :----------: |")
+    
     for op, data in op_counts.items():
         if op in ['TRANSFER', 'WITHDRAW', 'BALANCE']:
             rate = (data['success'] / data['total'] * 100) if data['total'] > 0 else 0
-            print(f"{op:<15} | {data['total']:<8} | {rate:.2f}%")
-    print("-" * 45)
+            # Isi Baris Tabel
+            report.append(f"| {op} | {data['total']} | {rate:.2f}% |")
+            
+    report.append("\n---\n")
+
+    # 4. Metrik Kegagalan Spesifik (Tabel Markdown)
+    report.append("## 🚨 Tingkat Kegagalan Utama (Error Breakdown)")
     
-    # 4. Metrik Kegagalan Spesifik (Sama seperti sebelumnya)
-    print("\n## 🚨 Tingkat Kegagalan Utama (Error Breakdown)")
-    print("-" * 40)
-    print(f"{'Jenis Error':<20} | {'Jumlah':<8} | {'Persentase Total'}")
-    print("-" * 40)
+    # Header Tabel
+    report.append("| Jenis Error | Jumlah | Persentase Total |")
+    report.append("| :--- | :---: | :-------------: |")
+    
     valid_errors = {k: v for k, v in error_types.items() if v > 0 and k not in ['TRANSFER', 'WITHDRAW', 'BALANCE']}
     for error, count in sorted(valid_errors.items(), key=lambda item: item[1], reverse=True):
         rate = (count / total * 100) if total > 0 else 0
-        print(f"{error:<20} | {count:<8} | {rate:.2f}%")
-    print("-" * 40)
-    print("=" * 60)
+        # Isi Baris Tabel
+        report.append(f"| {error} | {count} | {rate:.2f}% |")
+        
+    report.append("\n")
+    
+    return "\n".join(report)
 
 # --- Eksekusi Utama ---
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Penggunaan: python sli_report_daily.py <nama_file_log>")
+        print("Penggunaan: python sli_report_markdown.py <nama_file_log>")
         sys.exit(1)
 
     file_name = sys.argv[1]
@@ -160,8 +168,16 @@ if __name__ == "__main__":
             print(f"Error: File '{file_name}' tidak berisi entri log yang valid.")
             sys.exit(1)
 
-        generate_report(file_name, total, success, op_counts, error_types, daily_stats)
+        markdown_output = generate_markdown_report(file_name, total, success, op_counts, error_types, daily_stats)
         
+        # Cetak output Markdown ke konsol
+        print(markdown_output)
+        
+        # Pilihan: Simpan output ke file .md
+        # with open(f'{file_name}_sli_report.md', 'w') as f_out:
+        #     f_out.write(markdown_output)
+        # print(f"\nLaporan juga telah disimpan ke file '{file_name}_sli_report.md'")
+
     except FileNotFoundError:
         print(f"Error: File '{file_name}' tidak ditemukan.")
         sys.exit(1)
