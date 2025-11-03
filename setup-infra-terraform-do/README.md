@@ -14,6 +14,24 @@ Tujuan utamanya adalah merealisasikan topologi berikut menggunakan **Droplet/VM 
 | **Aplikasi Web** | 3 Droplet/VM | Node Web Server (Nginx) | Hanya **Privat** (VPC/VPC Network) |
 | **Database** | 2 Droplet/VM | Primary & Secondary (Replikasi Manual) | Hanya **Privat** (VPC/VPC Network) |
 
+
+```mermaid
+graph TD
+    A[Pengguna/Internet] --> B(Load Balancer);
+    subgraph Layer Aplikasi
+        B --> C{Web App 1};
+        B --> D{Web App 2};
+        B --> E{Web App 3};
+    end
+    subgraph Layer Database
+        C --> F[DB Primary];
+        D --> F;
+        E --> F;
+        F -- Replikasi Asinkron/Sinkron --> G[DB Secondary];
+    end
+```
+
+
 -----
 
 ## 💾 Struktur Proyek
@@ -22,7 +40,7 @@ Proyek ini memiliki tiga file konfigurasi Terraform yang terpisah, masing-masing
 
 | File Terraform | Cloud Provider | Keterangan |
 | :--- | :--- | :--- |
-| `main.tf` | **DigitalOcean** | Menggunakan **Droplet** dan **VPC** DigitalOcean. |
+| `main-do.tf` | **DigitalOcean** | Menggunakan **Droplet** dan **VPC** DigitalOcean. |
 | `main-aws.tf` | **AWS** | Menggunakan **EC2**, **VPC**, **Subnet**, dan **Security Groups**. |
 | `main-gcp.tf` | **GCP** | Menggunakan **Compute Engine**, **VPC Network**, dan **Firewall Rules**. |
 
