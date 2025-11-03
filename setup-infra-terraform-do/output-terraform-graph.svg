@@ -1,0 +1,233 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1264pt" height="625pt" viewBox="0.00 0.00 1264.00 625.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 621.42)">
+<polygon fill="white" stroke="none" points="-4,4 -4,-621.42 1259.68,-621.42 1259.68,4 -4,4"/>
+<!-- [root] aws_instance.db_node[0] -->
+<g id="node1" class="node">
+<title>[root] aws_instance.db_node[0]</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-288" rx="133.86" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-283.8" font-family="Times,serif" font-size="14.00">[root] aws_instance.db_node[0]</text>
+</g>
+<!-- [root] digitalocean_ssh_key.default -->
+<g id="node2" class="node">
+<title>[root] digitalocean_ssh_key.default</title>
+<ellipse fill="none" stroke="black" cx="430.32" cy="-153" rx="123.4" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="430.32" y="-148.8" font-family="Times,serif" font-size="14.00">digitalocean_ssh_key.default</text>
+</g>
+<!-- [root] aws_instance.db_node[0]&#45;&gt;[root] digitalocean_ssh_key.default -->
+<g id="edge1" class="edge">
+<title>[root] aws_instance.db_node[0]-&gt;[root] digitalocean_ssh_key.default</title>
+<path fill="none" stroke="black" d="M228.35,-274.67C242.89,-271.11 257.53,-266.63 270.92,-261 320.13,-240.29 369.86,-203.13 400.14,-178.27"/>
+<polygon fill="black" stroke="black" points="402.28,-181.04 407.72,-171.95 397.8,-175.66 402.28,-181.04"/>
+</g>
+<!-- [root] aws_instance.db_node[1] -->
+<g id="node3" class="node">
+<title>[root] aws_instance.db_node[1]</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-234" rx="133.86" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-229.8" font-family="Times,serif" font-size="14.00">[root] aws_instance.db_node[1]</text>
+</g>
+<!-- [root] aws_instance.db_node[1]&#45;&gt;[root] digitalocean_ssh_key.default -->
+<g id="edge2" class="edge">
+<title>[root] aws_instance.db_node[1]-&gt;[root] digitalocean_ssh_key.default</title>
+<path fill="none" stroke="black" d="M217.91,-219.42C235.5,-215.78 253.91,-211.59 270.92,-207 305.52,-197.67 343.55,-184.79 373.68,-173.96"/>
+<polygon fill="black" stroke="black" points="374.77,-177.28 382.97,-170.58 372.38,-170.7 374.77,-177.28"/>
+</g>
+<!-- [root] aws_instance.web_app[0] -->
+<g id="node4" class="node">
+<title>[root] aws_instance.web_app[0]</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-180" rx="135.46" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-175.8" font-family="Times,serif" font-size="14.00">[root] aws_instance.web_app[0]</text>
+</g>
+<!-- [root] aws_instance.web_app[0]&#45;&gt;[root] digitalocean_ssh_key.default -->
+<g id="edge3" class="edge">
+<title>[root] aws_instance.web_app[0]-&gt;[root] digitalocean_ssh_key.default</title>
+<path fill="none" stroke="black" d="M248.01,-169.72C269.48,-167.74 292.02,-165.66 313.62,-163.67"/>
+<polygon fill="black" stroke="black" points="313.68,-167.18 323.31,-162.77 313.04,-160.21 313.68,-167.18"/>
+</g>
+<!-- [root] aws_instance.web_app[1] -->
+<g id="node5" class="node">
+<title>[root] aws_instance.web_app[1]</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-126" rx="135.46" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-121.8" font-family="Times,serif" font-size="14.00">[root] aws_instance.web_app[1]</text>
+</g>
+<!-- [root] aws_instance.web_app[1]&#45;&gt;[root] digitalocean_ssh_key.default -->
+<g id="edge4" class="edge">
+<title>[root] aws_instance.web_app[1]-&gt;[root] digitalocean_ssh_key.default</title>
+<path fill="none" stroke="black" d="M248.01,-136.28C269.48,-138.26 292.02,-140.34 313.62,-142.33"/>
+<polygon fill="black" stroke="black" points="313.04,-145.79 323.31,-143.23 313.68,-138.82 313.04,-145.79"/>
+</g>
+<!-- [root] aws_instance.web_app[2] -->
+<g id="node6" class="node">
+<title>[root] aws_instance.web_app[2]</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-72" rx="135.46" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-67.8" font-family="Times,serif" font-size="14.00">[root] aws_instance.web_app[2]</text>
+</g>
+<!-- [root] aws_instance.web_app[2]&#45;&gt;[root] digitalocean_ssh_key.default -->
+<g id="edge5" class="edge">
+<title>[root] aws_instance.web_app[2]-&gt;[root] digitalocean_ssh_key.default</title>
+<path fill="none" stroke="black" d="M218.27,-86.66C235.74,-90.28 254.02,-94.44 270.92,-99 305.52,-108.33 343.55,-121.21 373.68,-132.04"/>
+<polygon fill="black" stroke="black" points="372.38,-135.3 382.97,-135.42 374.77,-128.72 372.38,-135.3"/>
+</g>
+<!-- [root] aws_instance.haproxy_lb -->
+<g id="node7" class="node">
+<title>[root] aws_instance.haproxy_lb</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-18" rx="133.32" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-13.8" font-family="Times,serif" font-size="14.00">[root] aws_instance.haproxy_lb</text>
+</g>
+<!-- [root] aws_instance.haproxy_lb&#45;&gt;[root] digitalocean_ssh_key.default -->
+<g id="edge6" class="edge">
+<title>[root] aws_instance.haproxy_lb-&gt;[root] digitalocean_ssh_key.default</title>
+<path fill="none" stroke="black" d="M227.99,-31.24C242.65,-34.81 257.42,-39.32 270.92,-45 320.13,-65.71 369.86,-102.87 400.14,-127.73"/>
+<polygon fill="black" stroke="black" points="397.8,-130.34 407.72,-134.05 402.28,-124.96 397.8,-130.34"/>
+</g>
+<!-- [root] digitalocean_droplet.database_node[0] -->
+<g id="node8" class="node">
+<title>[root] digitalocean_droplet.database_node[0]</title>
+<ellipse fill="none" stroke="black" cx="856.18" cy="-388" rx="78.1" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="856.18" y="-392.2" font-family="Times,serif" font-size="14.00">db-primary</text>
+<text xml:space="preserve" text-anchor="middle" x="856.18" y="-375.4" font-family="Times,serif" font-size="14.00">(Database Node)</text>
+</g>
+<!-- [root] digitalocean_vpc.private_network -->
+<g id="node9" class="node">
+<title>[root] digitalocean_vpc.private_network</title>
+<ellipse fill="none" stroke="black" cx="1112.98" cy="-464" rx="142.7" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="1112.98" y="-459.8" font-family="Times,serif" font-size="14.00">digitalocean_vpc.private_network</text>
+</g>
+<!-- [root] digitalocean_droplet.database_node[0]&#45;&gt;[root] digitalocean_vpc.private_network -->
+<g id="edge7" class="edge">
+<title>[root] digitalocean_droplet.database_node[0]-&gt;[root] digitalocean_vpc.private_network</title>
+<path fill="none" stroke="black" d="M918.21,-406.2C956.3,-417.56 1005.36,-432.2 1044.58,-443.9"/>
+<polygon fill="black" stroke="black" points="1043.34,-447.18 1053.92,-446.68 1045.34,-440.47 1043.34,-447.18"/>
+</g>
+<!-- [root] digitalocean_droplet.database_node[1] -->
+<g id="node10" class="node">
+<title>[root] digitalocean_droplet.database_node[1]</title>
+<ellipse fill="none" stroke="black" cx="856.18" cy="-588" rx="78.1" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="856.18" y="-592.2" font-family="Times,serif" font-size="14.00">db-secondary</text>
+<text xml:space="preserve" text-anchor="middle" x="856.18" y="-575.4" font-family="Times,serif" font-size="14.00">(Database Node)</text>
+</g>
+<!-- [root] digitalocean_droplet.database_node[1]&#45;&gt;[root] digitalocean_vpc.private_network -->
+<g id="edge8" class="edge">
+<title>[root] digitalocean_droplet.database_node[1]-&gt;[root] digitalocean_vpc.private_network</title>
+<path fill="none" stroke="black" d="M905.11,-564.68C950.98,-542.35 1019.74,-508.89 1065.22,-486.76"/>
+<polygon fill="black" stroke="black" points="1066.58,-489.99 1074.04,-482.46 1063.52,-483.69 1066.58,-489.99"/>
+</g>
+<!-- [root] digitalocean_droplet.web_app[0] -->
+<g id="node11" class="node">
+<title>[root] digitalocean_droplet.web_app[0]</title>
+<ellipse fill="none" stroke="black" cx="665.9" cy="-320" rx="76.18" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="665.9" y="-324.2" font-family="Times,serif" font-size="14.00">web-app-node-1</text>
+<text xml:space="preserve" text-anchor="middle" x="665.9" y="-307.4" font-family="Times,serif" font-size="14.00">(App Node)</text>
+</g>
+<!-- [root] digitalocean_droplet.web_app[0]&#45;&gt;[root] digitalocean_droplet.database_node[0] -->
+<g id="edge13" class="edge">
+<title>[root] digitalocean_droplet.web_app[0]-&gt;[root] digitalocean_droplet.database_node[0]</title>
+<path fill="none" stroke="black" d="M722.62,-340.13C743.22,-347.56 766.77,-356.07 788.26,-363.83"/>
+<polygon fill="black" stroke="black" points="786.93,-367.07 797.52,-367.18 789.3,-360.49 786.93,-367.07"/>
+</g>
+<!-- [root] digitalocean_droplet.web_app[0]&#45;&gt;[root] digitalocean_vpc.private_network -->
+<g id="edge9" class="edge">
+<title>[root] digitalocean_droplet.web_app[0]-&gt;[root] digitalocean_vpc.private_network</title>
+<path fill="none" stroke="black" d="M742.42,-319.38C797.14,-321.08 872.1,-327.93 934.28,-350 991.27,-370.23 1048.61,-411.73 1082.18,-438.69"/>
+<polygon fill="black" stroke="black" points="1079.86,-441.31 1089.82,-444.92 1084.28,-435.89 1079.86,-441.31"/>
+</g>
+<!-- [root] digitalocean_droplet.web_app[1] -->
+<g id="node12" class="node">
+<title>[root] digitalocean_droplet.web_app[1]</title>
+<ellipse fill="none" stroke="black" cx="665.9" cy="-397" rx="76.18" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="665.9" y="-401.2" font-family="Times,serif" font-size="14.00">web-app-node-2</text>
+<text xml:space="preserve" text-anchor="middle" x="665.9" y="-384.4" font-family="Times,serif" font-size="14.00">(App Node)</text>
+</g>
+<!-- [root] digitalocean_droplet.web_app[1]&#45;&gt;[root] digitalocean_droplet.database_node[0] -->
+<g id="edge14" class="edge">
+<title>[root] digitalocean_droplet.web_app[1]-&gt;[root] digitalocean_droplet.database_node[0]</title>
+<path fill="none" stroke="black" d="M741.85,-393.42C750.1,-393.02 758.56,-392.62 766.95,-392.22"/>
+<polygon fill="black" stroke="black" points="766.99,-395.72 776.81,-391.75 766.66,-388.73 766.99,-395.72"/>
+</g>
+<!-- [root] digitalocean_droplet.web_app[1]&#45;&gt;[root] digitalocean_vpc.private_network -->
+<g id="edge10" class="edge">
+<title>[root] digitalocean_droplet.web_app[1]-&gt;[root] digitalocean_vpc.private_network</title>
+<path fill="none" stroke="black" d="M727.71,-414.52C743.97,-418.75 761.61,-422.93 778.08,-426 843.95,-438.28 917.93,-447.18 979.47,-453.28"/>
+<polygon fill="black" stroke="black" points="979.02,-456.75 989.31,-454.24 979.69,-449.78 979.02,-456.75"/>
+</g>
+<!-- [root] digitalocean_droplet.web_app[2] -->
+<g id="node13" class="node">
+<title>[root] digitalocean_droplet.web_app[2]</title>
+<ellipse fill="none" stroke="black" cx="665.9" cy="-474" rx="76.18" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="665.9" y="-478.2" font-family="Times,serif" font-size="14.00">web-app-node-3</text>
+<text xml:space="preserve" text-anchor="middle" x="665.9" y="-461.4" font-family="Times,serif" font-size="14.00">(App Node)</text>
+</g>
+<!-- [root] digitalocean_droplet.web_app[2]&#45;&gt;[root] digitalocean_droplet.database_node[0] -->
+<g id="edge15" class="edge">
+<title>[root] digitalocean_droplet.web_app[2]-&gt;[root] digitalocean_droplet.database_node[0]</title>
+<path fill="none" stroke="black" d="M715.87,-451.63C740.1,-440.56 769.56,-427.11 795.14,-415.42"/>
+<polygon fill="black" stroke="black" points="796.45,-418.67 804.09,-411.34 793.54,-412.31 796.45,-418.67"/>
+</g>
+<!-- [root] digitalocean_droplet.web_app[2]&#45;&gt;[root] digitalocean_vpc.private_network -->
+<g id="edge11" class="edge">
+<title>[root] digitalocean_droplet.web_app[2]-&gt;[root] digitalocean_vpc.private_network</title>
+<path fill="none" stroke="black" d="M742.4,-472.3C802.08,-470.96 887.31,-469.05 960.88,-467.39"/>
+<polygon fill="black" stroke="black" points="960.68,-470.9 970.6,-467.18 960.52,-463.9 960.68,-470.9"/>
+</g>
+<!-- [root] digitalocean_droplet.haproxy_lb -->
+<g id="node14" class="node">
+<title>[root] digitalocean_droplet.haproxy_lb</title>
+<ellipse fill="none" stroke="black" cx="430.32" cy="-397" rx="111.37" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="430.32" y="-401.2" font-family="Times,serif" font-size="14.00">HAProxy-Load-Balancer</text>
+<text xml:space="preserve" text-anchor="middle" x="430.32" y="-384.4" font-family="Times,serif" font-size="14.00">(LB Node)</text>
+</g>
+<!-- [root] digitalocean_droplet.haproxy_lb&#45;&gt;[root] digitalocean_vpc.private_network -->
+<g id="edge12" class="edge">
+<title>[root] digitalocean_droplet.haproxy_lb-&gt;[root] digitalocean_vpc.private_network</title>
+<path fill="none" stroke="black" d="M459.07,-425.78C488.44,-453.97 537.68,-495.1 589.71,-512 750.61,-564.25 953.04,-515.38 1051.98,-484.64"/>
+<polygon fill="black" stroke="black" points="1052.73,-488.07 1061.22,-481.72 1050.63,-481.4 1052.73,-488.07"/>
+</g>
+<!-- [root] digitalocean_droplet.haproxy_lb&#45;&gt;[root] digitalocean_droplet.web_app[0] -->
+<g id="edge16" class="edge">
+<title>[root] digitalocean_droplet.haproxy_lb-&gt;[root] digitalocean_droplet.web_app[0]</title>
+<path fill="none" stroke="black" d="M501.08,-374C531.25,-364.06 566.45,-352.45 596.47,-342.56"/>
+<polygon fill="black" stroke="black" points="597.44,-345.92 605.84,-339.47 595.25,-339.28 597.44,-345.92"/>
+</g>
+<!-- [root] digitalocean_droplet.haproxy_lb&#45;&gt;[root] digitalocean_droplet.web_app[1] -->
+<g id="edge17" class="edge">
+<title>[root] digitalocean_droplet.haproxy_lb-&gt;[root] digitalocean_droplet.web_app[1]</title>
+<path fill="none" stroke="black" d="M541.95,-397C554.1,-397 566.34,-397 578.15,-397"/>
+<polygon fill="black" stroke="black" points="577.8,-400.5 587.8,-397 577.8,-393.5 577.8,-400.5"/>
+</g>
+<!-- [root] digitalocean_droplet.haproxy_lb&#45;&gt;[root] digitalocean_droplet.web_app[2] -->
+<g id="edge18" class="edge">
+<title>[root] digitalocean_droplet.haproxy_lb-&gt;[root] digitalocean_droplet.web_app[2]</title>
+<path fill="none" stroke="black" d="M501.08,-420C531.25,-429.94 566.45,-441.55 596.47,-451.44"/>
+<polygon fill="black" stroke="black" points="595.25,-454.72 605.84,-454.53 597.44,-448.08 595.25,-454.72"/>
+</g>
+<!-- [root] output.haproxy_public_ip -->
+<g id="node15" class="node">
+<title>[root] output.haproxy_public_ip</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-397" rx="111.08" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-392.8" font-family="Times,serif" font-size="14.00">output.haproxy_public_ip</text>
+</g>
+<!-- [root] output.haproxy_public_ip&#45;&gt;[root] digitalocean_droplet.haproxy_lb -->
+<g id="edge19" class="edge">
+<title>[root] output.haproxy_public_ip-&gt;[root] digitalocean_droplet.haproxy_lb</title>
+<path fill="none" stroke="black" d="M246.76,-397C266.5,-397 287.18,-397 307.24,-397"/>
+<polygon fill="black" stroke="black" points="307.12,-400.5 317.12,-397 307.12,-393.5 307.12,-400.5"/>
+</g>
+<!-- [root] output.private_ips_summary -->
+<g id="node16" class="node">
+<title>[root] output.private_ips_summary</title>
+<ellipse fill="none" stroke="black" cx="135.46" cy="-342" rx="121.81" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="135.46" y="-337.8" font-family="Times,serif" font-size="14.00">output.private_ips_summary</text>
+</g>
+<!-- [root] output.private_ips_summary&#45;&gt;[root] digitalocean_droplet.web_app[0] -->
+<g id="edge21" class="edge">
+<title>[root] output.private_ips_summary-&gt;[root] digitalocean_droplet.web_app[0]</title>
+<path fill="none" stroke="black" d="M253.41,-337.13C351.7,-333.04 489.95,-327.28 578.49,-323.6"/>
+<polygon fill="black" stroke="black" points="578.48,-327.1 588.33,-323.19 578.19,-320.11 578.48,-327.1"/>
+</g>
+<!-- [root] output.private_ips_summary&#45;&gt;[root] digitalocean_droplet.haproxy_lb -->
+<g id="edge20" class="edge">
+<title>[root] output.private_ips_summary-&gt;[root] digitalocean_droplet.haproxy_lb</title>
+<path fill="none" stroke="black" d="M212.64,-356.31C247.73,-362.9 289.88,-370.81 327.63,-377.9"/>
+<polygon fill="black" stroke="black" points="326.71,-381.29 337.19,-379.7 328.01,-374.41 326.71,-381.29"/>
+</g>
+</g>
+</svg>

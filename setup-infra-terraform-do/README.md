@@ -109,6 +109,73 @@ Untuk menghapus semua sumber daya yang dibuat, jalankan:
 terraform destroy
 ```
 
+### 5. Visualisasi
+
+Kita bisa membuat visualisasi dari script terraform dengan perintah berikut:
+
+```bash
+terraform graph > graph.dot
+```
+
+File hasilnya seperti ini
+
+```dot
+digraph {
+    // Ketergantungan Root
+    rankdir = LR
+    compound = true
+    subgraph "root" {
+        "[root] aws_instance.db_node[0]" -> "[root] digitalocean_ssh_key.default"
+        "[root] aws_instance.db_node[1]" -> "[root] digitalocean_ssh_key.default"
+        "[root] aws_instance.web_app[0]" -> "[root] digitalocean_ssh_key.default"
+        "[root] aws_instance.web_app[1]" -> "[root] digitalocean_ssh_key.default"
+        "[root] aws_instance.web_app[2]" -> "[root] digitalocean_ssh_key.default"
+        "[root] aws_instance.haproxy_lb" -> "[root] digitalocean_ssh_key.default"
+        
+        // Ketergantungan Jaringan
+        "[root] digitalocean_droplet.database_node[0]" -> "[root] digitalocean_vpc.private_network"
+        "[root] digitalocean_droplet.database_node[1]" -> "[root] digitalocean_vpc.private_network"
+        "[root] digitalocean_droplet.web_app[0]" -> "[root] digitalocean_vpc.private_network"
+        "[root] digitalocean_droplet.web_app[1]" -> "[root] digitalocean_vpc.private_network"
+        "[root] digitalocean_droplet.web_app[2]" -> "[root] digitalocean_vpc.private_network"
+        "[root] digitalocean_droplet.haproxy_lb" -> "[root] digitalocean_vpc.private_network"
+
+        // Ketergantungan Data
+        "[root] digitalocean_droplet.web_app[0]" -> "[root] digitalocean_droplet.database_node[0]"
+        "[root] digitalocean_droplet.web_app[1]" -> "[root] digitalocean_droplet.database_node[0]"
+        "[root] digitalocean_droplet.web_app[2]" -> "[root] digitalocean_droplet.database_node[0]"
+        
+        // Ketergantungan Load Balancer
+        // LB HAProxy bergantung pada semua Node Aplikasi Web dan IP Private mereka
+        "[root] digitalocean_droplet.haproxy_lb" -> "[root] digitalocean_droplet.web_app[0]"
+        "[root] digitalocean_droplet.haproxy_lb" -> "[root] digitalocean_droplet.web_app[1]"
+        "[root] digitalocean_droplet.haproxy_lb" -> "[root] digitalocean_droplet.web_app[2]"
+
+        // Ketergantungan Output
+        "[root] output.haproxy_public_ip" -> "[root] digitalocean_droplet.haproxy_lb"
+        "[root] output.private_ips_summary" -> "[root] digitalocean_droplet.haproxy_lb"
+        "[root] output.private_ips_summary" -> "[root] digitalocean_droplet.web_app[0]"
+        // ... dan semua node lainnya
+        
+        // Sumber Daya
+        "[root] digitalocean_ssh_key.default" [label = "digitalocean_ssh_key.default"]
+        "[root] digitalocean_vpc.private_network" [label = "digitalocean_vpc.private_network"]
+        "[root] digitalocean_droplet.database_node[0]" [label = "db-primary\n(Database Node)"]
+        "[root] digitalocean_droplet.database_node[1]" [label = "db-secondary\n(Database Node)"]
+        "[root] digitalocean_droplet.web_app[0]" [label = "web-app-node-1\n(App Node)"]
+        "[root] digitalocean_droplet.web_app[1]" [label = "web-app-node-2\n(App Node)"]
+        "[root] digitalocean_droplet.web_app[2]" [label = "web-app-node-3\n(App Node)"]
+        "[root] digitalocean_droplet.haproxy_lb" [label = "HAProxy-Load-Balancer\n(LB Node)"]
+
+        // Output
+        "[root] output.haproxy_public_ip" [label = "output.haproxy_public_ip"]
+        "[root] output.private_ips_summary" [label = "output.private_ips_summary"]
+    }
+}
+```
+
+Hasil rendernya seperti ini [![Terraform Graph](./output-terraform-graph.svg)](./output-terraform-graph.svg)
+
 -----
 
 ## 📝 Catatan Penting Mengenai Isolasi
