@@ -12,6 +12,23 @@ Proyek ini menggunakan **Terraform** untuk menyediakan arsitektur aplikasi web b
 | **Aplikasi Web** | 3 Droplet | Node Web Server (Nginx) | Hanya **Privat** (VPC) |
 | **Database** | 2 Droplet | Primary & Secondary (Replikasi Manual) | Hanya **Privat** (VPC) |
 
+
+```mermaid
+graph TD
+    A[Pengguna/Internet] --> B(Load Balancer);
+    subgraph Lapisan Aplikasi
+        B --> C{Web App 1};
+        B --> D{Web App 2};
+        B --> E{Web App 3};
+    end
+    subgraph Lapisan Database
+        C --> F[DB Primary];
+        D --> F;
+        E --> F;
+        F -- Replikasi Asinkron/Sinkron --> G[DB Secondary];
+    end
+```
+
 -----
 
 ## 🔒 Arsitektur Jaringan (VPC)
