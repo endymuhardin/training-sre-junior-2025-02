@@ -1,0 +1,1 @@
+%{YEAR:year}-%{MONTHNUM:month}-%{MONTHDAY:day} %{HOUR:hour}:%{MINUTE:minute}:%{SECOND:second}\.%{INT:millis}\s+%{LOGLEVEL:loglevel}\s+%{INT:pid}\s+---\s+\[%{DATA:thread}\]\s+%{DATA:logger}\s*:\s+%{GREEDYDATA:message}

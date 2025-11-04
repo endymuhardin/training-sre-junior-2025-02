@@ -1,0 +1,7 @@
+2025-11-04 13:37:30.100  INFO 7890 --- [           main] c.e.d.DemoApplication                    : Starting DemoApplication using Java 21 with PID 7890 (started by user in /app)
+2025-11-04 13:37:30.400  INFO 7890 --- [           main] o.s.e.w.s.TomcatWebServer                : Tomcat initialized with port(s): 8080 (http)
+2025-11-04 13:37:30.700  INFO 7890 --- [           main] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-11-04 13:37:31.000  INFO 7890 --- [           main] o.s.b.w.s.ControllerMapping              : Mapped "{[/api/hello],methods=[GET]}" onto public java.lang.String com.example.demo.controller.HelloController.hello()
+2025-11-04 13:37:31.050  INFO 7890 --- [           main] o.s.b.w.s.ControllerMapping              : Mapped "{[/api/error],methods=[GET]}" onto public void com.example.demo.controller.ErrorController.triggerError()
+2025-11-04 13:37:31.300  INFO 7890 --- [           main] o.s.e.w.s.TomcatWebServer                : **Tomcat started on port(s): 8080 (http)** with context path ''
+2025-11-04 13:37:31.310  INFO 7890 --- [           main] c.e.d.DemoApplication                    : **Started DemoApplication in 1.210 seconds** (JVM running for 2.000)

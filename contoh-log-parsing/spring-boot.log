@@ -1,0 +1,81 @@
+.   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '  \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::        (v3.2.0)
+
+2025-11-04 13:37:30.100  INFO 7890 --- [           main] c.e.d.DemoApplication                    : Starting DemoApplication using Java 21 with PID 7890 (started by user in /app)
+2025-11-04 13:37:30.400  INFO 7890 --- [           main] o.s.e.w.s.TomcatWebServer                : Tomcat initialized with port(s): 8080 (http)
+2025-11-04 13:37:30.700  INFO 7890 --- [           main] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-11-04 13:37:31.000  INFO 7890 --- [           main] o.s.b.w.s.ControllerMapping              : Mapped "{[/api/hello],methods=[GET]}" onto public java.lang.String com.example.demo.controller.HelloController.hello()
+2025-11-04 13:37:31.050  INFO 7890 --- [           main] o.s.b.w.s.ControllerMapping              : Mapped "{[/api/error],methods=[GET]}" onto public void com.example.demo.controller.ErrorController.triggerError()
+2025-11-04 13:37:31.300  INFO 7890 --- [           main] o.s.e.w.s.TomcatWebServer                : Tomcat started on port(s): 8080 (http) with context path ''
+2025-11-04 13:37:31.310  INFO 7890 --- [           main] c.e.d.DemoApplication                    : Started DemoApplication in 1.210 seconds (JVM running for 2.000)
+
+--- Request 1: GET /api/hello (Berhasil) ---
+
+2025-11-04 13:37:35.500  INFO 7890 --- [nio-8080-exec-1] c.e.d.c.HelloController                  : Menerima GET request untuk /api/hello
+2025-11-04 13:37:35.600  INFO 7890 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : GET "/api/hello" completed with status 200
+
+--- Request 2: GET /api/error (Gagal/Exception - Stacktrace Penuh) ---
+
+2025-11-04 13:37:40.100  INFO 7890 --- [nio-8080-exec-2] c.e.d.c.ErrorController                  : Menerima GET request untuk /api/error
+2025-11-04 13:37:40.150  INFO 7890 --- [nio-8080-exec-2] o.s.t.i.TransactionInterceptor           : Initiating transaction for custom class [com.example.demo.service.ErrorService]
+2025-11-04 13:37:40.200 ERROR 7890 --- [nio-8080-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception
+java.lang.IllegalArgumentException: Data ID tidak valid atau tidak ditemukan!
+	at com.example.demo.service.ErrorService.processData(ErrorService.java:45) ~[classes/:na]
+	at com.example.demo.service.ErrorService$$FastClassBySpringCGLIB$$b12c345a.invoke(<generated>) ~[classes/:na]
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:693) ~[spring-aop-6.1.0.jar:6.1.0]
+	at com.example.demo.service.ErrorService.$Proxy67.processData(<generated>) ~[classes/:na]
+	at com.example.demo.controller.ErrorController.triggerError(ErrorController.java:30) ~[classes/:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[na:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77) ~[na:na]
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:205) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:150) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:895) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:808) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1071) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:964) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1006) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:898) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:626) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:883) ~[spring-webmvc-6.1.0.jar:6.1.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:227) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:119) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:189) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:119) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:189) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:119) ~[spring-web-6.1.0.jar:6.1.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:189) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.StandardWrapperFacade.doFilter(StandardWrapperFacade.java:103) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationDispatcher.invoke(ApplicationDispatcher.java:745) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationDispatcher.processRequest(ApplicationDispatcher.java:487) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationDispatcher.doForward(ApplicationDispatcher.java:413) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.ApplicationDispatcher.forward(ApplicationDispatcher.java:331) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:140) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:92) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:343) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:390) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:939) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1784) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:49) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+	at org.apache.tomcat.util.threads.TaskThread.run(TaskThread.java:61) ~[tomcat-embed-core-10.0.80.jar:10.0.80]
+
+2025-11-04 13:37:40.300  INFO 7890 --- [nio-8080-exec-2] o.s.t.i.TransactionInterceptor           : Completing transaction for [com.example.demo.service.ErrorService] after exception
+2025-11-04 13:37:40.400  WARN 7890 --- [nio-8080-exec-2] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [java.lang.IllegalArgumentException: Data ID tidak valid atau tidak ditemukan!] to status 400 (Bad Request)
+2025-11-04 13:37:40.500  INFO 7890 --- [nio-8080-exec-2] o.s.web.servlet.DispatcherServlet        : GET "/api/error" completed with status 400
