@@ -52,6 +52,55 @@ node server.js
 
 -----
 
+## 🔍 Monitoring Bottleneck CPU
+
+Untuk memverifikasi bahwa *bottleneck* yang Anda simulasikan benar-benar membebani CPU, Anda perlu menggunakan *monitoring tools* sistem saat *load testing* berlangsung.
+
+### Prerequisites
+
+Pastikan Anda memiliki terminal atau akses SSH ke server tempat aplikasi Node.js berjalan.
+
+### Langkah-Langkah Monitoring
+
+1.  **Buka Terminal Baru:** Buka terminal kedua atau koneksi SSH terpisah ke server Anda.
+
+2.  **Jalankan Tool Monitoring:** Jalankan salah satu perintah berikut:
+
+      * **`top`** (tersedia hampir di semua distribusi Linux/Unix)
+      * **`htop`** (seringkali lebih *user-friendly*, mungkin perlu diinstal: `sudo apt install htop`)
+
+    <!-- end list -->
+
+    ```bash
+    top
+    # atau
+    htop
+    ```
+
+3.  **Mulai Load Test:** Di terminal pertama atau melalui *load testing tool* (JMeter/k6), mulai kirim permintaan ke *endpoint* `/cpu-intensive`.
+
+### 📊 Hal yang Harus Diperhatikan
+
+Saat *load test* berjalan, amati metrik berikut pada tampilan `top` atau `htop`:
+
+  * **Penggunaan CPU Total:**
+      * Cari persentase **CPU Usage** (biasanya di bagian atas, ditunjukkan sebagai `%Cpu(s)` atau bar berwarna). Anda akan melihat salah satu *core* CPU melonjak hingga **mendekati 100%** di bagian *User space* (`us`).
+  * **Proses Node.js:**
+      * Cari baris proses yang memiliki nama **`node`** (atau `node server.js`).
+      * Perhatikan kolom **`%CPU`** pada baris ini. Anda akan melihat nilai ini melonjak hingga **100% atau mendekati 100%**. Ini menunjukkan bahwa proses Node.js tersebutlah yang menyebabkan *bottleneck* CPU.
+  * **Load Average:**
+      * Angka ini (biasanya di bagian atas `top`) menunjukkan rata-rata jumlah proses yang *running* atau *waiting* (mengantri) untuk mendapatkan waktu CPU. Saat *bottleneck* terjadi, angka ini akan **meningkat tajam**, jauh melebihi jumlah *core* CPU yang Anda miliki.
+
+#### Contoh Tampilan (Konseptual)
+
+| Metrik | Sebelum Load Test | Selama Load Test (`/cpu-intensive`) |
+| :--- | :--- | :--- |
+| **`%CPU` Proses `node`** | 0 - 5% | **\~100%** |
+| **CPU Usage Total (`us`)** | Rendah | **Tinggi (Satu Core Penuh)** |
+| **Load Average** | Rendah (misalnya 0.2) | **Tinggi (misalnya \> 5.0)** |
+
+Dengan memonitor metrik ini, Anda mendapatkan bukti visual dan kuantitatif bahwa *endpoint* `/cpu-intensive` berhasil menciptakan **bottleneck yang terikat CPU** (*CPU-bound bottleneck*) di server Anda.
+
 ## 🌐 Endpoint Aplikasi
 
 Aplikasi menyediakan dua *endpoint* utama untuk pengujian:
