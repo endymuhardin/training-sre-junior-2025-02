@@ -1,0 +1,5 @@
+192.168.1.10 - - [04/Nov/2025:14:45:01 +0700] "GET /api/products/123 HTTP/1.1" 200 154 "-" "PostmanRuntime/7.26.8"
+192.168.1.10 - - [04/Nov/2025:14:46:25 +0700] "POST /api/orders HTTP/1.1" 401 51 "-" "PostmanRuntime/7.26.8"
+203.0.113.5 - - [04/Nov/2025:14:47:40 +0700] "POST /login HTTP/1.1" 500 850 "https://example.com/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36"
+203.0.113.5 - - [04/Nov/2025:14:48:55 +0700] "GET /dashboard HTTP/1.1" 200 4500 "https://example.com/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36"
+192.168.1.15 - - [04/Nov/2025:14:50:10 +0700] "GET /non-existent-page HTTP/1.1" 404 146 "-" "curl/7.68.0"

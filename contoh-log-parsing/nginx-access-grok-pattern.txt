@@ -1,0 +1,1 @@
+%{IPORHOST:client_ip} - - \[%{HTTPDATE:timestamp}\] "%{WORD:request_method} %{URIPATHPARAM:request_path}(?: HTTP/%{NUMBER:http_version})?" %{NUMBER:status:int} (?:%{NUMBER:body_bytes_sent:int}|-) "(?:%{DATA:referrer}|-)" "(?:%{DATA:user_agent}|-)"

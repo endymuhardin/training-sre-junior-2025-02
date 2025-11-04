@@ -1,0 +1,57 @@
+[
+  {
+    "client_ip": "192.168.1.10",
+    "timestamp": "04/Nov/2025:14:45:01 +0700",
+    "request_method": "GET",
+    "request_path": "/api/products/123",
+    "http_version": 1.1,
+    "status": 200,
+    "body_bytes_sent": 154,
+    "referrer": "-",
+    "user_agent": "PostmanRuntime/7.26.8"
+  },
+  {
+    "client_ip": "192.168.1.10",
+    "timestamp": "04/Nov/2025:14:46:25 +0700",
+    "request_method": "POST",
+    "request_path": "/api/orders",
+    "http_version": 1.1,
+    "status": 401,
+    "body_bytes_sent": 51,
+    "referrer": "-",
+    "user_agent": "PostmanRuntime/7.26.8"
+  },
+  {
+    "client_ip": "203.0.113.5",
+    "timestamp": "04/Nov/2025:14:47:40 +0700",
+    "request_method": "POST",
+    "request_path": "/login",
+    "http_version": 1.1,
+    "status": 500,
+    "body_bytes_sent": 850,
+    "referrer": "https://example.com/login",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36"
+  },
+  {
+    "client_ip": "203.0.113.5",
+    "timestamp": "04/Nov/2025:14:48:55 +0700",
+    "request_method": "GET",
+    "request_path": "/dashboard",
+    "http_version": 1.1,
+    "status": 200,
+    "body_bytes_sent": 4500,
+    "referrer": "https://example.com/",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36"
+  },
+  {
+    "client_ip": "192.168.1.15",
+    "timestamp": "04/Nov/2025:14:50:10 +0700",
+    "request_method": "GET",
+    "request_path": "/non-existent-page",
+    "http_version": 1.1,
+    "status": 404,
+    "body_bytes_sent": 146,
+    "referrer": "-",
+    "user_agent": "curl/7.68.0"
+  }
+]
