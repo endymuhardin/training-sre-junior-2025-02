@@ -1,0 +1,1 @@
+%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:log_level} %{NUMBER:pid} \[%{DATA:service_name},%{DATA:trace_id},%{DATA:span_id}\] \[%{DATA:thread}\] %{DATA:logger}: %{GREEDYDATA:message}

@@ -1,5 +1,5 @@
 2025-11-04 13:40:00.100 INFO 7890 [service-a,,] [main] c.e.d.DemoApplication: Starting DemoApplication (Service A) using Java 21 with PID 7890
 2025-11-04 13:40:01.310 INFO 7890 [service-a,,] [main] c.e.d.DemoApplication: Started DemoApplication (Service A) in 1.210 seconds
-2025-11-04 13:40:05.100 INFO 7890 [service-a,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,1a2b3c4d5e6f7890] [nio-8080-exec-1] c.e.d.c.StartController: **Menerima GET request /api/start**. Memanggil Service B.
-2025-11-04 13:40:06.100 INFO 7890 [service-a,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,1a2b3c4d5e6f7890] [nio-8080-exec-1] c.e.d.c.StartController: Response akhir dari Service B diterima. **Siklus trace selesai.**
+2025-11-04 13:40:05.100 INFO 7890 [service-a,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,1a2b3c4d5e6f7890] [nio-8080-exec-1] c.e.d.c.StartController: Menerima GET request /api/start. Memanggil Service B.
+2025-11-04 13:40:06.100 INFO 7890 [service-a,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,1a2b3c4d5e6f7890] [nio-8080-exec-1] c.e.d.c.StartController: Response akhir dari Service B diterima. Siklus trace selesai.
 2025-11-04 13:40:06.200 INFO 7890 [service-a,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,1a2b3c4d5e6f7890] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet: GET "/api/start" completed with status 200

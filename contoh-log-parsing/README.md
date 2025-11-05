@@ -119,6 +119,111 @@ Format one line memudahkan parsing karena setiap log entry ada dalam satu baris 
 - `logger`: Nama class logger
 - `message`: Pesan log
 
+### 4. Distributed Tracing Log (Spring Boot Sleuth/Micrometer)
+
+**File-file:**
+- `distributed-tracing/service-a.log` - Log dari Service A (entry point)
+- `distributed-tracing/service-b.log` - Log dari Service B (middle service)
+- `distributed-tracing/service-c.log` - Log dari Service C (downstream service)
+- `distributed-tracing/distributed-tracing-grok-pattern.txt` - Grok pattern untuk parsing
+- `distributed-tracing/distributed-tracing-parse-result.json` - Hasil parsing dalam format JSON
+- `distributed-tracing/grokdebugger-test-result.png` - Screenshot hasil testing di grokdebugger.com
+
+**Deskripsi:**
+Distributed tracing adalah teknik untuk tracking request yang melewati multiple microservices. Spring Boot Sleuth/Micrometer menambahkan informasi tracing ke log:
+- **Trace ID**: ID unik untuk satu request flow yang melewati semua service
+- **Span ID**: ID unik untuk satu unit kerja dalam satu service
+- **Parent Span ID**: ID span dari service pemanggil
+
+Informasi ini sangat berguna untuk:
+- Debugging issues di microservices architecture
+- Performance analysis
+- Dependency mapping antar service
+- End-to-end request monitoring
+
+**Grok Pattern:**
+```
+%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:log_level} %{NUMBER:pid} \[%{DATA:service_name},%{DATA:trace_id},%{DATA:span_id}\] \[%{DATA:thread}\] %{DATA:logger}: %{GREEDYDATA:message}
+```
+
+**Testing Result:**
+Pattern ini telah ditest menggunakan [grokdebugger.com](https://grokdebugger.com) dengan hasil **10/10 logs berhasil di-parse** dari ketiga service. Screenshot hasil testing tersedia di `distributed-tracing/grokdebugger-test-result.png`.
+
+**Contoh log:**
+```
+2025-11-04 13:40:05.100 INFO 7890 [service-a,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,1a2b3c4d5e6f7890] [nio-8080-exec-1] c.e.d.c.StartController: Menerima GET request /api/start. Memanggil Service B.
+```
+
+**Contoh log tanpa tracing context:**
+```
+2025-11-04 13:40:00.100 INFO 7890 [service-a,,] [main] c.e.d.DemoApplication: Starting DemoApplication (Service A) using Java 21 with PID 7890
+```
+
+**Field yang di-extract:**
+- `timestamp`: Waktu log (format ISO8601)
+- `log_level`: Level log (INFO, WARN, ERROR, DEBUG, dll)
+- `pid`: Process ID aplikasi (number)
+- `service_name`: Nama service (service-a, service-b, service-c)
+- `trace_id`: Trace ID untuk correlating logs antar service (optional, kosong jika tidak ada tracing context)
+- `span_id`: Span ID untuk unit kerja dalam service ini (optional, kosong jika tidak ada tracing context)
+- `thread`: Thread name yang menulis log
+- `logger`: Nama class logger
+- `message`: Pesan log
+
+**Request Flow Diagram:**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ServiceA
+    participant ServiceB
+    participant ServiceC
+
+    Note over User,ServiceC: Trace ID: d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32
+
+    User->>ServiceA: GET /api/start
+    Note right of ServiceA: 13:40:05.100<br/>Span: 1a2b3c4d5e6f7890
+
+    ServiceA->>ServiceB: GET /api/process
+    Note right of ServiceB: 13:40:05.300<br/>Span: f1e2d3c4b5a67890<br/>Parent: 1a2b...7890
+
+    ServiceB->>ServiceC: GET /api/validate
+    Note right of ServiceC: 13:40:05.500<br/>Span: a9b8c7d6e5f43210
+
+    Note right of ServiceC: Validasi data (100ms)
+    ServiceC-->>ServiceB: 200 OK (13:40:05.600)
+
+    Note right of ServiceB: Proses hasil (100ms)
+    ServiceB-->>ServiceA: 200 OK (13:40:05.900)
+
+    Note right of ServiceA: Selesai (100ms)
+    ServiceA-->>User: 200 OK (13:40:06.200)
+```
+
+**Service Dependency Graph:**
+
+```mermaid
+graph LR
+    A[User/Client] -->|HTTP Request| B[Service A<br/>Port 8080]
+    B -->|HTTP Request| C[Service B<br/>Port 8081]
+    C -->|HTTP Request| D[Service C<br/>Port 8082]
+
+    style B fill:#e1f5ff
+    style C fill:#fff4e1
+    style D fill:#e8f5e9
+```
+
+**Penjelasan Tracing:**
+
+Semua service menggunakan **Trace ID** yang sama: `d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32`. Trace ID ini digunakan untuk menghubungkan semua log yang berkaitan dengan satu request dari user, walaupun request tersebut melewati banyak service.
+
+Setiap service memiliki **Span ID** yang unik:
+- Service A: `1a2b3c4d5e6f7890` (root span)
+- Service B: `f1e2d3c4b5a67890` (child dari Service A span)
+- Service C: `a9b8c7d6e5f43210` (child dari Service B span)
+
+**Total Duration:** 1.1 detik (dari 13:40:05.100 sampai 13:40:06.200)
+
 ## Cara Menggunakan Grok Pattern
 
 ### 1. Menggunakan Logstash

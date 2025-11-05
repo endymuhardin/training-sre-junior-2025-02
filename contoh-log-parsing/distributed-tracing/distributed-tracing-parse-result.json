@@ -1,0 +1,108 @@
+[
+  {
+    "timestamp": "2025-11-04 13:40:00.100",
+    "log_level": "INFO",
+    "pid": 7890,
+    "service_name": "service-a",
+    "thread": "main",
+    "logger": "c.e.d.DemoApplication",
+    "message": "Starting DemoApplication (Service A) using Java 21 with PID 7890"
+  },
+  {
+    "timestamp": "2025-11-04 13:40:01.310",
+    "log_level": "INFO",
+    "pid": 7890,
+    "service_name": "service-a",
+    "thread": "main",
+    "logger": "c.e.d.DemoApplication",
+    "message": "Started DemoApplication (Service A) in 1.210 seconds"
+  },
+  {
+    "timestamp": "2025-11-04 13:40:05.100",
+    "log_level": "INFO",
+    "pid": 7890,
+    "service_name": "service-a",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "1a2b3c4d5e6f7890",
+    "thread": "nio-8080-exec-1",
+    "logger": "c.e.d.c.StartController",
+    "message": "Menerima GET request /api/start. Memanggil Service B."
+  },
+  {
+    "timestamp": "2025-11-04 13:40:06.100",
+    "log_level": "INFO",
+    "pid": 7890,
+    "service_name": "service-a",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "1a2b3c4d5e6f7890",
+    "thread": "nio-8080-exec-1",
+    "logger": "c.e.d.c.StartController",
+    "message": "Response akhir dari Service B diterima. Siklus trace selesai."
+  },
+  {
+    "timestamp": "2025-11-04 13:40:06.200",
+    "log_level": "INFO",
+    "pid": 7890,
+    "service_name": "service-a",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "1a2b3c4d5e6f7890",
+    "thread": "nio-8080-exec-1",
+    "logger": "o.s.web.servlet.DispatcherServlet",
+    "message": "GET \"/api/start\" completed with status 200"
+  },
+  {
+    "timestamp": "2025-11-04 13:40:05.300",
+    "log_level": "INFO",
+    "pid": 7891,
+    "service_name": "service-b",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "f1e2d3c4b5a67890",
+    "thread": "nio-8080-exec-3",
+    "logger": "c.e.d.c.ProcessController",
+    "message": "Menerima request dari Service A (Parent Span: 1a2b...7890). Memanggil Service C."
+  },
+  {
+    "timestamp": "2025-11-04 13:40:05.800",
+    "log_level": "INFO",
+    "pid": 7891,
+    "service_name": "service-b",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "f1e2d3c4b5a67890",
+    "thread": "nio-8080-exec-3",
+    "logger": "c.e.d.c.ProcessController",
+    "message": "Response dari Service C diterima. Memproses hasil."
+  },
+  {
+    "timestamp": "2025-11-04 13:40:05.900",
+    "log_level": "INFO",
+    "pid": 7891,
+    "service_name": "service-b",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "f1e2d3c4b5a67890",
+    "thread": "nio-8080-exec-3",
+    "logger": "o.s.web.servlet.DispatcherServlet",
+    "message": "GET \"/api/process\" completed with status 200."
+  },
+  {
+    "timestamp": "2025-11-04 13:40:05.500",
+    "log_level": "INFO",
+    "pid": 7892,
+    "service_name": "service-c",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "a9b8c7d6e5f43210",
+    "thread": "nio-8080-exec-5",
+    "logger": "c.e.d.s.ValidateService",
+    "message": "Menerima request dari Service B. Melakukan validasi data."
+  },
+  {
+    "timestamp": "2025-11-04 13:40:05.600",
+    "log_level": "INFO",
+    "pid": 7892,
+    "service_name": "service-c",
+    "trace_id": "d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32",
+    "span_id": "a9b8c7d6e5f43210",
+    "thread": "nio-8080-exec-5",
+    "logger": "o.s.web.servlet.DispatcherServlet",
+    "message": "GET \"/api/validate\" completed with status 200."
+  }
+]

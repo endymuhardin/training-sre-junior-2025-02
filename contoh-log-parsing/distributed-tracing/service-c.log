@@ -1,2 +1,2 @@
-2025-11-04 13:40:05.500 INFO 7892 [service-c,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,a9b8c7d6e5f43210] [nio-8080-exec-5] c.e.d.s.ValidateService: **Menerima request dari Service B.** Melakukan validasi data.
+2025-11-04 13:40:05.500 INFO 7892 [service-c,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,a9b8c7d6e5f43210] [nio-8080-exec-5] c.e.d.s.ValidateService: Menerima request dari Service B. Melakukan validasi data.
 2025-11-04 13:40:05.600 INFO 7892 [service-c,d8b7c65a4e3d2c1b0a9f8e7d6c5b4a32,a9b8c7d6e5f43210] [nio-8080-exec-5] o.s.web.servlet.DispatcherServlet: GET "/api/validate" completed with status 200.
