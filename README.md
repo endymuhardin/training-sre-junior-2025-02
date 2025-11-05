@@ -4,4 +4,7 @@
 
 [![Gambar Hari 1](./gambar/materi-sre-hari-1.svg)](./gambar/materi-sre-hari-1.svg)
 
+**Gambar Hari 2**
+[![Gambar Hari 2](./gambar/materi-sre-hari-2.svg)](./gambar/materi-sre-hari-2.svg)
+
 
