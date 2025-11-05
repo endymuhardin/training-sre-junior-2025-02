@@ -121,3 +121,33 @@ Kebutuhan Software (pilih salah satu):
         ```
         docker compose down
         ```
+
+## Menjalankan Contoh Aplikasi Spring Boot ##
+
+1. Matikan dulu podman/docker compose
+
+    ```
+    podman compose down
+    ```
+
+    atau 
+
+    ```
+    docker compose down
+    ```
+
+2. Hapus folder volume mapping database
+
+    ```
+    rm -rf db-belajar
+    ```
+
+3. Jalankan lagi podman/docker compose
+
+4. Jalankan aplikasi spring boot
+
+    ```
+    mvn clean spring-boot:run
+    ```
+
+5. Cek hasilnya di [http://localhost:8080/api/product](http://localhost:8080/api/product)
