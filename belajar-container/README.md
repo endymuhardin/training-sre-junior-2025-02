@@ -61,3 +61,35 @@ Kebutuhan Software (pilih salah satu):
         ```
         \q
         ```
+
+## Menjalankan Container dengan Compose ##
+
+1. Buat file `compose.yml` berisi daftar container yang mau dijalankan
+
+2. Jalankan filenya
+
+    * Dengan Podman
+
+        ```
+        podman compose up
+        ```
+    
+    * Dengan Docker
+
+        ```
+        docker compose up
+        ```
+
+3. Cek container yang berjalan untuk mendapatkan nama container
+
+    * Dengan Podman
+
+        ```
+        podman ps -a
+        ```
+    
+    * Dengan Docker
+
+        ```
+        docker ps -a
+        ```
