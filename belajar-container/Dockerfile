@@ -9,7 +9,7 @@ RUN mvn dependency:go-offline
 # menambahkan folder src ke dalam container
 COPY src ./src
 # menjalankan compile source code dan buat jar file
-RUN mvn package
+RUN mvn package -DskipTests
 
 # Tahap 2 : Extract menjadi layer-layer
 FROM amazoncorretto:25-alpine AS JARLAYER
