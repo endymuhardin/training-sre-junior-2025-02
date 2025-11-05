@@ -151,3 +151,59 @@ Kebutuhan Software (pilih salah satu):
     ```
 
 5. Cek hasilnya di [http://localhost:8080/api/product](http://localhost:8080/api/product)
+
+## Membuat Docker Image ##
+
+1. Buat `Dockerfile`
+
+2. Jalankan command untuk build
+
+    ```
+    podman build -t belajar-container .
+    ```
+
+    atau
+
+    ```
+    docker build -t belajar-container .
+    ```
+
+    **Jangan lupa titik di belakang, menunjukkan build context, yaitu folder saat ini (current folder)**
+
+3. Tag untuk upload ke repository
+
+    ```
+    podman tag belajar-container docker.io/endymuhardin/belajar-container
+    ```
+
+    atau
+
+    ```
+    docker tag belajar-container endymuhardin/belajar-container
+    ```
+
+4. Login ke DockerHub
+
+    ```
+    podman login
+    ```
+
+    atau
+
+    ```
+    docker login
+    ```
+
+    Masukkan username dan password akun di [DockerHub](https://hub.docker.com)
+
+5. Upload image
+
+    ```
+    podman push docker.io/endymuhardin/belajar-container
+    ```
+
+    atau
+
+    ```
+    docker push endymuhardin/belajar-container
+    ```
