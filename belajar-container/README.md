@@ -80,7 +80,21 @@ Kebutuhan Software (pilih salah satu):
         docker compose up
         ```
 
-3. Cek container yang berjalan untuk mendapatkan nama container
+3. Menjalankan compose di background (berguna jika kita ingin exit terminal setelahnya)
+
+    * Dengan Podman
+
+        ```
+        podman compose up -d
+        ```
+    
+    * Dengan Docker
+
+        ```
+        docker compose up -d
+        ```
+
+4. Cek container yang berjalan untuk mendapatkan nama container
 
     * Dengan Podman
 
@@ -92,4 +106,18 @@ Kebutuhan Software (pilih salah satu):
 
         ```
         docker ps -a
+        ```
+
+5. Mematikan container yang berjalan di compose
+
+    * Dengan Podman
+
+        ```
+        podman compose down
+        ```
+    
+    * Dengan Docker
+
+        ```
+        docker compose down
         ```
