@@ -21,3 +21,43 @@ Kebutuhan Software (pilih salah satu):
         ```
         docker run -e POSTGRES_DB=belajar -e POSTGRES_USER=belajar -e POSTGRES_PASSWORD=docker -p 12345:5432 -v "/Users/endymuhardin/workspace/training/training-sre-junior-2025-02/belajar-container/db-belajar":"/var/lib/postgresql/data" postgres:17-alpine
         ```
+
+2. Connect ke running container
+
+    * Menggunakan podman
+
+        ```
+        podman exec -it <container_name_or_id> /bin/bash
+        ```
+
+    * Menggunakan docker
+
+        ```
+        docker exec -it <container_name_or_id> /bin/bash
+        ```
+
+3. Melihat isi database (setelah connect ke running container)
+
+    * Login 
+
+        ```
+        psql -U belajar -d belajar
+        ```
+    
+    * Melihat daftar tabel/sequence
+
+        ```
+        \d
+        ```
+    
+    * Melihat isi tabel `product`
+
+        ```
+        select * from product;
+        ```
+    
+    * Keluar dari shell postgres
+
+        ```
+        \q
+        ```
