@@ -11,7 +11,7 @@ services:
       - ./db-belajar:/var/lib/postgresql/data
   
   app-belajar:
-    image: belajar-container:latest
+    image: endymuhardin/belajar-container:latest
     environment:
       #SPRING_DATASOURCE_URL: jdbc:postgresql://10.99.18.57:12345/belajar
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-belajar:5432/belajar

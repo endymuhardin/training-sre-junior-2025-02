@@ -207,3 +207,11 @@ Kebutuhan Software (pilih salah satu):
     ```
     docker push endymuhardin/belajar-container
     ```
+
+6. Build docker image untuk beberapa architecture (arm64 dan amd64) sekaligus
+
+    ```
+    docker buildx build --platform linux/amd64,linux/arm64 --push -t endymuhardin/belajar-container .
+    ```
+
+    **Catatan: versi podman [terlalu ribet setupnya](https://medium.com/@guillem.riera/podman-machine-setup-for-x86-64-on-apple-silicon-run-docker-amd64-containers-on-m1-m2-m3-bf02bea38598)**
