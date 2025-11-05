@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: belajar
       POSTGRES_USER: belajar
-      POSTGRES_password: docker
+      POSTGRES_PASSWORD: docker
     ports:
       - 12345:5432
     volumes:
