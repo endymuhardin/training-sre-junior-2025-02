@@ -477,6 +477,170 @@ kubectl edit secret belajar-secret
 kubectl rollout restart deployment/db-belajar
 ```
 
+### Scaling Replicas (Menambah/Mengurangi Jumlah Pod) ###
+
+Scaling adalah proses menambah atau mengurangi jumlah replicas (pod) dari sebuah deployment. Ini berguna untuk:
+* **Scale up** - menambah replicas saat traffic tinggi
+* **Scale down** - mengurangi replicas saat traffic rendah
+* **High availability** - menjalankan multiple replicas untuk redundancy
+
+#### 1. Melihat Jumlah Replicas Saat Ini ####
+
+```bash
+# Lihat semua deployments dan jumlah replicasnya
+kubectl get deployments
+
+# Lihat detail deployment tertentu
+kubectl describe deployment app-belajar
+```
+
+Output akan menampilkan:
+```
+NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+app-belajar   1/1     1            1           5m
+```
+
+#### 2. Scale Menggunakan Command Line (Cara Cepat) ####
+
+```bash
+# Scale aplikasi web menjadi 3 replicas
+kubectl scale deployment app-belajar --replicas=3
+
+# Verifikasi hasil scaling
+kubectl get deployments
+kubectl get pods
+
+# Scale down menjadi 1 replica
+kubectl scale deployment app-belajar --replicas=1
+
+# Scale database (hati-hati dengan stateful apps!)
+kubectl scale deployment db-belajar --replicas=1
+```
+
+**Catatan:** Database biasanya tidak bisa di-scale horizontal dengan mudah karena shared storage. Untuk scale database, perlu setup clustering (misal PostgreSQL dengan replication).
+
+#### 3. Scale Dengan Edit File YAML (Cara Persistent) ####
+
+Edit file `k8s/06-webapp.yml`:
+
+```bash
+kubectl edit deployment app-belajar
+```
+
+Atau edit file langsung, ubah bagian `replicas`:
+
+```yaml
+spec:
+  replicas: 3  # Ubah dari 1 menjadi 3
+  selector:
+    matchLabels:
+      app: belajar-app
+```
+
+Kemudian apply perubahan:
+
+```bash
+kubectl apply -f k8s/06-webapp.yml
+```
+
+#### 4. Monitoring Proses Scaling ####
+
+```bash
+# Watch pods saat scaling berlangsung
+kubectl get pods -w
+
+# Lihat events scaling
+kubectl describe deployment app-belajar
+
+# Lihat rollout status
+kubectl rollout status deployment/app-belajar
+```
+
+#### 5. Load Balancing Antar Replicas ####
+
+Service akan secara otomatis melakukan load balancing ke semua replicas yang available:
+
+```bash
+# Lihat endpoints yang di-manage oleh service
+kubectl get endpoints app-belajar
+
+# Detail endpoints
+kubectl describe endpoints app-belajar
+```
+
+Output akan menampilkan IP dari semua pod replicas.
+
+#### 6. Test Load Balancing ####
+
+```bash
+# Akses aplikasi berkali-kali
+for i in {1..10}; do
+  curl http://<node-ip>:30001/api/product
+done
+
+# Lihat log dari semua replicas untuk memastikan traffic terdistribusi
+kubectl logs -l app=belajar-app --tail=20
+```
+
+#### 7. Auto Scaling (Horizontal Pod Autoscaler) ####
+
+Untuk auto scaling berdasarkan CPU/memory usage:
+
+```bash
+# Setup autoscaler (min 1, max 5 replicas, target CPU 50%)
+kubectl autoscale deployment app-belajar --min=1 --max=5 --cpu-percent=50
+
+# Lihat status HPA
+kubectl get hpa
+
+# Detail HPA
+kubectl describe hpa app-belajar
+
+# Hapus autoscaler
+kubectl delete hpa app-belajar
+```
+
+**Catatan:** HPA membutuhkan metrics-server yang terinstall di cluster.
+
+#### 8. Best Practices Untuk Scaling ####
+
+**Aplikasi Web (Stateless):**
+* Aman untuk di-scale horizontal (multiple replicas)
+* Pastikan aplikasi tidak menyimpan state di memory/disk lokal
+* Session harus di-share (Redis, database) atau gunakan stateless auth (JWT)
+
+**Database (Stateful):**
+* **JANGAN** scale horizontal sembarangan
+* Gunakan StatefulSet, bukan Deployment
+* Setup replication/clustering dengan benar
+* Primary-Replica atau Multi-Master architecture
+* Untuk PostgreSQL: gunakan tools seperti Patroni, Stolon, atau managed database
+
+**Contoh Setup Multi-Replica untuk Aplikasi:**
+
+Edit `k8s/06-webapp.yml` dan update replicas menjadi 3:
+
+```yaml
+spec:
+  replicas: 3
+```
+
+Apply perubahan:
+
+```bash
+kubectl apply -f k8s/06-webapp.yml
+
+# Tunggu sampai semua pod running
+kubectl get pods -w
+```
+
+Verify load balancing:
+
+```bash
+# Lihat pod mana yang handle request
+kubectl logs -l app=belajar-app -f
+```
+
 ### Membersihkan Resource ###
 
 #### 1. Hapus semua resource sekaligus ####
