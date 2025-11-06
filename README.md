@@ -7,4 +7,7 @@
 **Gambar Hari 2**
 [![Gambar Hari 2](./gambar/materi-sre-hari-2.svg)](./gambar/materi-sre-hari-2.svg)
 
+**Gambar Hari 3**
+[![Gambar Hari 3](./gambar/materi-sre-hari-3.svg)](./gambar/materi-sre-hari-3.svg)
+
 
