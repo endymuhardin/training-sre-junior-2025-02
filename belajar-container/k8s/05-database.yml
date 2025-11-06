@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: db-belajar
   labels:
     app: postgres
 spec:
+  serviceName: db-belajar-headless
   replicas: 1
   selector:
     matchLabels:
@@ -19,6 +20,7 @@ spec:
         image: postgres:17-alpine
         ports:
         - containerPort: 5432
+          name: postgres
         env:
         - name: POSTGRES_DB
           valueFrom:
@@ -35,13 +37,36 @@ spec:
             secretKeyRef:
               name: belajar-secret
               key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
-      volumes:
-      - name: postgres-storage
-        persistentVolumeClaim:
-          claimName: postgres-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: manual
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-belajar-headless
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  selector:
+    app: postgres
 ---
 apiVersion: v1
 kind: Service
@@ -54,5 +79,6 @@ spec:
   ports:
   - port: 5432
     targetPort: 5432
+    name: postgres
   selector:
     app: postgres
