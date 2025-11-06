@@ -1,0 +1,33 @@
+# Load generator untuk testing HPA
+# Deploy ini akan generate continuous traffic ke aplikasi
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  labels:
+    app: load-generator
+spec:
+  replicas: 3  # Sesuaikan untuk mengatur intensitas load
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+      - name: load-gen
+        image: busybox
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - "while true; do wget -q -O- http://app-belajar:8080/api/product; done"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi

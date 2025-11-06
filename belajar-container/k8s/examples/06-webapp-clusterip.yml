@@ -28,6 +28,13 @@ spec:
             configMapKeyRef:
               name: belajar-config
               key: SPRING_DATASOURCE_URL
+        resources:
+          requests:
+            cpu: 100m      # 100 millicore = 0.1 CPU core
+            memory: 128Mi
+          limits:
+            cpu: 500m      # 500 millicore = 0.5 CPU core
+            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

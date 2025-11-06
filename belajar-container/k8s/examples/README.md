@@ -94,6 +94,49 @@ Port mapping yang dikonfigurasi:
 - containerPort: 30001 (NodePort di dalam cluster)
 - hostPort: 8080 (Port di host machine)
 
+## HPA Configuration
+
+### hpa.yml
+
+HorizontalPodAutoscaler configuration untuk auto-scaling berdasarkan CPU dan memory.
+
+**Features:**
+- Min replicas: 1, Max replicas: 10
+- Target CPU: 50%, Target memory: 80%
+- Smart scale-up (immediate) dan scale-down (5 min stabilization)
+
+**Cara pakai:**
+```bash
+# Pastikan metrics-server sudah terinstall
+kubectl top nodes
+
+# Apply HPA
+kubectl apply -f examples/hpa.yml
+
+# Monitor HPA
+kubectl get hpa -w
+```
+
+## Load Testing
+
+### load-generator.yml
+
+Deployment untuk generate continuous HTTP traffic ke aplikasi untuk testing HPA.
+
+**Cara pakai:**
+```bash
+# Deploy load generator
+kubectl apply -f examples/load-generator.yml
+
+# Watch HPA dan pods scaling
+watch 'kubectl get hpa && echo && kubectl get pods'
+
+# Cleanup
+kubectl delete -f examples/load-generator.yml
+```
+
+**Catatan**: Sesuaikan `replicas` di load-generator.yml untuk mengatur intensitas load.
+
 ## Quick Reference
 
 | File | Service Type | Environment | Access Method |
@@ -104,3 +147,7 @@ Port mapping yang dikonfigurasi:
 | `06-webapp-loadbalancer.yml` | LoadBalancer | K3s | Auto via ServiceLB |
 | `06-webapp-clusterip.yml` | ClusterIP | Any | `kubectl port-forward` |
 | `06-webapp-clusterip.yml` + `07-ingress.yml` | ClusterIP | K3s | `http://belajar.local` |
+| `hpa.yml` | - | Any (with metrics-server) | Auto-scaling config |
+| `load-generator.yml` | - | Any | Load testing tool |
+
+**Note**: Semua webapp example files sudah include resource requests/limits yang required untuk HPA.
