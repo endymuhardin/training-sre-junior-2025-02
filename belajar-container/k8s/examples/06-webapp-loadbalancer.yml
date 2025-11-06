@@ -1,3 +1,6 @@
+# Gunakan file ini untuk Docker Desktop Kubernetes, Minikube (dengan tunnel), atau K3s
+# Copy file ini menjadi 06-webapp.yml untuk menggunakan LoadBalancer
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,10 +36,9 @@ metadata:
   labels:
     app: belajar-app
 spec:
-  type: NodePort  # Default untuk Kind cluster
+  type: LoadBalancer  # LoadBalancer untuk Docker Desktop K8s, Minikube, atau K3s
   selector:
     app: belajar-app
   ports:
   - port: 8080
     targetPort: 8080
-    nodePort: 30001  # Untuk Kind dengan extraPortMappings
