@@ -33,10 +33,9 @@ metadata:
   labels:
     app: belajar-app
 spec:
-  type: NodePort
+  type: LoadBalancer
+  selector:
+    app: belajar-app
   ports:
   - port: 8080
     targetPort: 8080
-    nodePort: 30001
-  selector:
-    app: belajar-app
