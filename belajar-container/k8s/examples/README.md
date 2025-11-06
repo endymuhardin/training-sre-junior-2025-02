@@ -151,3 +151,59 @@ kubectl delete -f examples/load-generator.yml
 | `load-generator.yml` | - | Any | Load testing tool |
 
 **Note**: Semua webapp example files sudah include resource requests/limits yang required untuk HPA.
+
+## Deployment Strategies
+
+Folder `deployment-strategies/` berisi contoh berbagai strategi deployment:
+
+### Rolling Update
+**File**: `deployment-strategies/rolling-update.yml`
+
+Strategi default Kubernetes. Update pods bertahap tanpa downtime.
+
+**Cara pakai:**
+```bash
+kubectl apply -f deployment-strategies/rolling-update.yml
+kubectl set image deployment/app-belajar app=endymuhardin/belajar-container:v2
+kubectl rollout status deployment/app-belajar
+```
+
+### Recreate
+**File**: `deployment-strategies/recreate.yml`
+
+Hapus semua pods lama, buat semua pods baru. Ada downtime.
+
+### Blue-Green
+**Folder**: `deployment-strategies/blue-green/`
+
+Maintain 2 environment. Switch traffic instant dari blue ke green.
+
+**Cara pakai:**
+```bash
+cd deployment-strategies/blue-green/
+kubectl apply -f 01-blue-deployment.yml
+kubectl apply -f 02-green-deployment.yml
+kubectl apply -f 03-service.yml
+
+# Switch ke green
+kubectl patch service app-belajar -p '{"spec":{"selector":{"version":"green"}}}'
+```
+
+### Canary
+**Folder**: `deployment-strategies/canary/`
+
+Rollout bertahap ke subset user. Control percentage dengan replica count.
+
+**Cara pakai:**
+```bash
+cd deployment-strategies/canary/
+kubectl apply -f 01-stable-deployment.yml
+kubectl apply -f 02-canary-deployment.yml
+kubectl apply -f 03-service.yml
+
+# Increase canary traffic ke 25%
+kubectl scale deployment app-belajar-v2 --replicas=3
+kubectl scale deployment app-belajar-v1 --replicas=9
+```
+
+Lihat [deployment-strategies/README.md](deployment-strategies/README.md) untuk detail lengkap.

@@ -1,0 +1,39 @@
+# Green Deployment - New Version
+# This is the new version to be tested before switching traffic
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar-green
+  labels:
+    app: belajar-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: belajar-app
+      version: green
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+        version: green
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v2  # New version
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: belajar-config
+              key: SPRING_DATASOURCE_URL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

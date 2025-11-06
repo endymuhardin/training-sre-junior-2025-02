@@ -1,0 +1,18 @@
+# Service for Blue-Green Deployment
+# Initially points to blue, can be switched to green
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-belajar
+  labels:
+    app: belajar-app
+spec:
+  type: NodePort
+  selector:
+    app: belajar-app
+    version: blue  # Change this to 'green' to switch traffic
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30001

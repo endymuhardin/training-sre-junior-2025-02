@@ -1,0 +1,56 @@
+# Rolling Update Strategy - Default Kubernetes strategy
+# Updates pods gradually without downtime
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar
+  labels:
+    app: belajar-app
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Max 1 extra pod during update
+      maxUnavailable: 0  # Always maintain full capacity
+  selector:
+    matchLabels:
+      app: belajar-app
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: belajar-config
+              key: SPRING_DATASOURCE_URL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Readiness probe untuk memastikan pod ready sebelum receive traffic
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        # Liveness probe untuk auto-restart unhealthy pods
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30

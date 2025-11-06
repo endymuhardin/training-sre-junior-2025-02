@@ -1,0 +1,39 @@
+# Canary Deployment - Stable Version (v1)
+# This serves majority of traffic
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar-v1
+  labels:
+    app: belajar-app
+spec:
+  replicas: 9  # 90% traffic (9 out of 10 pods)
+  selector:
+    matchLabels:
+      app: belajar-app
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+        version: v1
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v1
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: belajar-config
+              key: SPRING_DATASOURCE_URL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

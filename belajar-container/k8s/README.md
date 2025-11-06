@@ -23,6 +23,13 @@
   - [Manual Scaling](#manual-scaling)
   - [Horizontal Pod Autoscaler (HPA)](#horizontal-pod-autoscaler-hpa)
   - [Testing HPA dengan Load Testing](#testing-hpa-dengan-load-testing)
+- [Deployment Strategies](#deployment-strategies)
+  - [Rolling Update](#1-rolling-update-default)
+  - [Recreate](#2-recreate-strategy)
+  - [Blue-Green](#3-blue-green-deployment)
+  - [Canary](#4-canary-deployment)
+  - [A/B Testing](#5-ab-testing)
+  - [Advanced Tools](#advanced-tools)
 - [Cleanup](#cleanup)
 - [Best Practices](#best-practices)
 
@@ -1457,6 +1464,704 @@ done
 
 # Lihat log dari semua replicas
 kubectl logs -l app=belajar-app --tail=20
+```
+
+## Deployment Strategies
+
+Kubernetes mendukung berbagai strategi deployment untuk minimize downtime dan risk saat update aplikasi.
+
+### 1. Rolling Update (Default)
+
+Rolling Update adalah strategi default di Kubernetes. Pods di-update secara bertahap tanpa downtime.
+
+**Cara Kerja:**
+1. Create new pods dengan versi baru (sesuai maxSurge)
+2. Wait until new pods ready
+3. Terminate old pods (sesuai maxUnavailable)
+4. Repeat sampai semua pods updated
+
+**Konfigurasi:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Max pods tambahan saat update
+      maxUnavailable: 0  # Max pods yang boleh unavailable
+  template:
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v2
+```
+
+**Parameters:**
+
+**maxSurge:**
+- Maximum pods tambahan yang bisa dibuat saat update
+- Bisa integer (1, 2, 3) atau percentage (25%, 50%)
+- Default: 25%
+- Higher value = faster update tapi butuh lebih banyak resources
+
+**maxUnavailable:**
+- Maximum pods yang boleh unavailable saat update
+- Bisa integer atau percentage
+- Default: 25%
+- Tidak boleh 0 bersamaan dengan maxSurge: 0
+
+**Skenario Best Practices:**
+
+```yaml
+# Zero-Downtime (High Availability)
+maxSurge: 1
+maxUnavailable: 0
+# Always maintain full capacity, create new pod before terminating old
+
+# Fast Update (Resource Constrained)
+maxSurge: 0
+maxUnavailable: 1
+# No extra pods, terminate one before creating new
+
+# Balanced
+maxSurge: 1
+maxUnavailable: 1
+# Default behavior, balance speed and availability
+
+# Aggressive Update
+maxSurge: 100%
+maxUnavailable: 0
+# Double pods temporarily, update all at once (costly)
+```
+
+**Execute Rolling Update:**
+
+```bash
+# Update image version
+kubectl set image deployment/app-belajar app=endymuhardin/belajar-container:v2
+
+# Watch rollout
+kubectl rollout status deployment/app-belajar
+
+# Monitor pods
+kubectl get pods -w
+
+# Rollout history
+kubectl rollout history deployment/app-belajar
+
+# Rollback to previous version
+kubectl rollout undo deployment/app-belajar
+
+# Rollback to specific revision
+kubectl rollout undo deployment/app-belajar --to-revision=2
+
+# Pause rollout (untuk investigation)
+kubectl rollout pause deployment/app-belajar
+
+# Resume rollout
+kubectl rollout resume deployment/app-belajar
+```
+
+**Advantages:**
+- Zero downtime
+- Automatic rollback jika health check fail
+- Gradual update minimize risk
+
+**Disadvantages:**
+- Both versions running simultaneously
+- Rollback tidak instant (perlu rolling back)
+- Bisa ada temporary inconsistency
+
+### 2. Recreate Strategy
+
+Terminate semua pods lama, lalu create semua pods baru.
+
+**Konfigurasi:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v2
+```
+
+**Kapan Digunakan:**
+- Aplikasi tidak bisa run 2 versi bersamaan
+- Database migration yang breaking
+- Stateful apps dengan shared state
+- Dev/test environments
+
+**Advantages:**
+- Simple dan straightforward
+- No mixed versions
+- No resource overhead
+
+**Disadvantages:**
+- **Downtime** selama update
+- All-or-nothing (no gradual rollout)
+
+**Execute:**
+
+```bash
+kubectl apply -f deployment-recreate.yml
+
+# Monitor
+kubectl get pods -w
+```
+
+### 3. Blue-Green Deployment
+
+Maintain 2 production environments (blue = current, green = new). Switch traffic setelah new version tested.
+
+**Implementation di Kubernetes:**
+
+Blue-Green di K8s native dilakukan dengan:
+1. Deploy new version sebagai deployment terpisah
+2. Test new version
+3. Update service selector untuk route traffic ke new version
+
+**Setup:**
+
+**Step 1**: Deploy Blue (current version):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar-blue
+  labels:
+    app: belajar-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: belajar-app
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+        version: blue
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v1
+```
+
+**Step 2**: Service awalnya pointing ke blue:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-belajar
+spec:
+  selector:
+    app: belajar-app
+    version: blue  # Traffic ke blue
+  ports:
+  - port: 8080
+    targetPort: 8080
+```
+
+**Step 3**: Deploy Green (new version):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar-green
+  labels:
+    app: belajar-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: belajar-app
+      version: green
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+        version: green
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v2
+```
+
+**Step 4**: Test green environment:
+
+```bash
+# Deploy green
+kubectl apply -f deployment-green.yml
+
+# Wait until ready
+kubectl wait --for=condition=ready pod -l version=green --timeout=300s
+
+# Test green directly (port-forward)
+kubectl port-forward deployment/app-belajar-green 9090:8080
+
+# Test in browser: http://localhost:9090/api/product
+```
+
+**Step 5**: Switch traffic dari blue ke green:
+
+```bash
+# Update service selector
+kubectl patch service app-belajar -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Verify
+kubectl get service app-belajar -o yaml | grep -A 2 selector
+
+# Monitor
+kubectl get endpoints app-belajar
+```
+
+**Step 6**: Rollback jika ada issue:
+
+```bash
+# Switch back to blue
+kubectl patch service app-belajar -p '{"spec":{"selector":{"version":"blue"}}}'
+```
+
+**Step 7**: Cleanup old version:
+
+```bash
+# Setelah yakin green version stable
+kubectl delete deployment app-belajar-blue
+```
+
+**Advantages:**
+- Instant traffic switch
+- Easy rollback (just switch selector)
+- Zero downtime
+- Full testing di production environment sebelum switch
+
+**Disadvantages:**
+- **Double resources** during transition
+- Database migration complexity
+- Both versions must be compatible dengan same database schema
+
+### 4. Canary Deployment
+
+Deploy new version ke subset kecil user dulu, gradually increase traffic jika stable.
+
+**Implementation Options:**
+
+#### Option A: Native Kubernetes (Manual Replica Control)
+
+Control traffic dengan adjust replica count.
+
+```yaml
+# v1 (stable) - 9 replicas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar-v1
+spec:
+  replicas: 9
+  selector:
+    matchLabels:
+      app: belajar-app
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+        version: v1
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v1
+---
+# v2 (canary) - 1 replica (10% traffic)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: belajar-app
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+        version: v2
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v2
+---
+# Service select both versions
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-belajar
+spec:
+  selector:
+    app: belajar-app  # No version selector = both versions
+  ports:
+  - port: 8080
+    targetPort: 8080
+```
+
+**Gradually increase canary traffic:**
+
+```bash
+# Start: 10% canary (1 replica canary, 9 replicas stable)
+kubectl scale deployment app-belajar-v2 --replicas=1
+kubectl scale deployment app-belajar-v1 --replicas=9
+
+# Monitor metrics
+kubectl top pods -l app=belajar-app
+kubectl logs -l version=v2 --tail=100
+
+# Increase to 25% (1:3 ratio)
+kubectl scale deployment app-belajar-v2 --replicas=1
+kubectl scale deployment app-belajar-v1 --replicas=3
+
+# Increase to 50% (1:1 ratio)
+kubectl scale deployment app-belajar-v2 --replicas=2
+kubectl scale deployment app-belajar-v1 --replicas=2
+
+# Full rollout to 100%
+kubectl scale deployment app-belajar-v2 --replicas=3
+kubectl scale deployment app-belajar-v1 --replicas=0
+
+# Cleanup old version
+kubectl delete deployment app-belajar-v1
+```
+
+#### Option B: NGINX Ingress Controller (Weight-based)
+
+Lebih precise traffic control dengan Ingress annotations.
+
+```yaml
+# Main ingress (stable version)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-belajar-stable
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: belajar.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-belajar-v1
+            port:
+              number: 8080
+---
+# Canary ingress (new version)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-belajar-canary
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "10"  # 10% traffic
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: belajar.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-belajar-v2
+            port:
+              number: 8080
+```
+
+**Gradually increase:**
+
+```bash
+# Start with 10%
+kubectl patch ingress app-belajar-canary -p '{"metadata":{"annotations":{"nginx.ingress.kubernetes.io/canary-weight":"10"}}}'
+
+# Increase to 25%
+kubectl patch ingress app-belajar-canary -p '{"metadata":{"annotations":{"nginx.ingress.kubernetes.io/canary-weight":"25"}}}'
+
+# Increase to 50%
+kubectl patch ingress app-belajar-canary -p '{"metadata":{"annotations":{"nginx.ingress.kubernetes.io/canary-weight":"50"}}}'
+
+# Promote to stable (100%)
+kubectl delete ingress app-belajar-canary
+kubectl patch ingress app-belajar-stable --type='json' -p='[{"op":"replace","path":"/spec/rules/0/http/paths/0/backend/service/name","value":"app-belajar-v2"}]'
+```
+
+**NGINX Canary Annotations:**
+
+```yaml
+# Weight-based (percentage)
+nginx.ingress.kubernetes.io/canary-weight: "10"
+
+# Header-based (untuk testing specific user)
+nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
+nginx.ingress.kubernetes.io/canary-by-header-value: "enabled"
+
+# Cookie-based
+nginx.ingress.kubernetes.io/canary-by-cookie: "canary"
+```
+
+#### Option C: Istio Service Mesh (Advanced)
+
+Paling sophisticated dengan VirtualService dan DestinationRule.
+
+```yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: app-belajar
+spec:
+  hosts:
+  - app-belajar
+  http:
+  - match:
+    - headers:
+        x-canary:
+          exact: "true"
+    route:
+    - destination:
+        host: app-belajar
+        subset: v2
+  - route:
+    - destination:
+        host: app-belajar
+        subset: v1
+      weight: 90
+    - destination:
+        host: app-belajar
+        subset: v2
+      weight: 10
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: app-belajar
+spec:
+  host: app-belajar
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+```
+
+**Advantages:**
+- Minimal risk (small subset user)
+- Real production testing
+- Gradual rollout
+- Easy rollback
+- Metrics-driven decisions
+
+**Disadvantages:**
+- Complex implementation
+- Need monitoring/observability
+- Requires traffic splitting capability
+- Longer deployment time
+
+### 5. A/B Testing
+
+Mirip canary tapi fokus pada feature testing dan user behavior analysis.
+
+**Implementation dengan Header/Cookie routing:**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-belajar-variant-a
+spec:
+  rules:
+  - host: belajar.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-belajar-a
+            port:
+              number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-belajar-variant-b
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-cookie: "variant"
+    nginx.ingress.kubernetes.io/canary-by-cookie-value: "b"
+spec:
+  rules:
+  - host: belajar.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-belajar-b
+            port:
+              number: 8080
+```
+
+### Advanced Tools
+
+#### Argo Rollouts
+
+Kubernetes controller untuk advanced deployment strategies.
+
+**Features:**
+- Blue-Green deployments
+- Canary deployments dengan analysis
+- Progressive delivery
+- Automated rollback berdasarkan metrics
+- Integration dengan Prometheus, Datadog, New Relic
+
+**Install:**
+
+```bash
+kubectl create namespace argo-rollouts
+kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+```
+
+**Example Rollout:**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: app-belajar
+spec:
+  replicas: 5
+  strategy:
+    canary:
+      steps:
+      - setWeight: 20
+      - pause: {duration: 1m}
+      - setWeight: 40
+      - pause: {duration: 1m}
+      - setWeight: 60
+      - pause: {duration: 1m}
+      - setWeight: 80
+      - pause: {duration: 1m}
+  selector:
+    matchLabels:
+      app: belajar-app
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:v2
+```
+
+#### Flagger
+
+Automated canary deployments dengan Istio, Linkerd, atau NGINX.
+
+**Features:**
+- Automated canary analysis
+- Prometheus metrics-based decisions
+- Slack/Teams notifications
+- Automatic rollback
+
+### Comparison Matrix
+
+| Strategy | Downtime | Complexity | Resource Cost | Rollback Speed | Risk Level | Best For |
+|----------|----------|------------|---------------|----------------|------------|----------|
+| **Rolling Update** | None | Low | Low | Medium | Low-Medium | Most apps |
+| **Recreate** | Yes | Very Low | Low | Slow | High | Dev/Test, Stateful apps |
+| **Blue-Green** | None | Medium | High (2x) | Instant | Low | Critical apps |
+| **Canary** | None | High | Medium | Fast | Very Low | User-facing apps |
+| **A/B Testing** | None | High | Medium | Fast | Very Low | Feature experiments |
+
+### Choosing the Right Strategy
+
+**Rolling Update - Pilih jika:**
+- Aplikasi stateless
+- Need zero downtime
+- Limited resources
+- Simple deployment workflow
+
+**Recreate - Pilih jika:**
+- Aplikasi stateful dengan shared state
+- Database migration breaking changes
+- Dev/test environment
+- Downtime acceptable
+
+**Blue-Green - Pilih jika:**
+- Need instant rollback capability
+- Have enough resources (2x)
+- Zero downtime critical
+- Full production testing needed
+
+**Canary - Pilih jika:**
+- User-facing application
+- Want gradual rollout
+- Need real-world testing
+- Have monitoring/observability
+
+**A/B Testing - Pilih jika:**
+- Testing new features
+- Need user behavior data
+- Multiple variants to compare
+
+### Testing Deployment Strategies
+
+```bash
+# Watch deployment progress
+watch kubectl get pods
+
+# Monitor rollout
+kubectl rollout status deployment/app-belajar
+
+# Check revision history
+kubectl rollout history deployment/app-belajar
+
+# View specific revision
+kubectl rollout history deployment/app-belajar --revision=2
+
+# Test with load
+kubectl run -it --rm load-test --image=busybox --restart=Never -- sh
+# Inside pod:
+while true; do wget -q -O- http://app-belajar:8080/api/product && echo ""; sleep 1; done
+
+# Monitor logs during deployment
+kubectl logs -f -l app=belajar-app --all-containers=true
+
+# Check service endpoints
+kubectl get endpoints app-belajar -w
 ```
 
 ## Cleanup
