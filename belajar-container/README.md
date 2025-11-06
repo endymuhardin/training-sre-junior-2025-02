@@ -215,3 +215,300 @@ Kebutuhan Software (pilih salah satu):
     ```
 
     **Catatan: versi podman [terlalu ribet setupnya](https://medium.com/@guillem.riera/podman-machine-setup-for-x86-64-on-apple-silicon-run-docker-amd64-containers-on-m1-m2-m3-bf02bea38598)**
+
+## Menjalankan di Kubernetes ##
+
+### Prasyarat ###
+
+* Kubernetes cluster yang sudah berjalan (minikube, kind, Docker Desktop dengan Kubernetes enabled, atau cluster lainnya)
+* kubectl sudah terinstall dan terkonfigurasi
+
+### Struktur File Kubernetes ###
+
+Folder `k8s/` berisi file-file deployment descriptor yang sudah diurutkan sesuai urutan eksekusi:
+
+```
+k8s/
+├── 01-configmap.yml    # ConfigMap untuk konfigurasi non-sensitif
+├── 02-secret.yml       # Secret untuk data sensitif (password)
+├── 03-pv.yml          # PersistentVolume untuk penyimpanan database
+├── 04-pvc.yml         # PersistentVolumeClaim untuk request storage
+├── 05-database.yml    # Deployment & Service untuk PostgreSQL
+└── 06-webapp.yml      # Deployment & Service untuk aplikasi web
+```
+
+### Penjelasan Komponen ###
+
+#### 1. ConfigMap (01-configmap.yml) ####
+
+ConfigMap digunakan untuk menyimpan **konfigurasi yang tidak sensitif** dalam bentuk key-value pairs:
+
+* `POSTGRES_DB` - nama database
+* `POSTGRES_USER` - username database
+* `SPRING_DATASOURCE_URL` - connection string aplikasi ke database
+
+ConfigMap bersifat **plain text** dan bisa dilihat siapa saja yang punya akses ke cluster.
+
+#### 2. Secret (02-secret.yml) ####
+
+Secret digunakan untuk menyimpan **data sensitif** seperti password, token, atau API key:
+
+* `POSTGRES_PASSWORD` - password database
+
+Secret di-encode dengan base64 (bukan enkripsi). Di production, sebaiknya gunakan enkripsi at-rest dan RBAC untuk membatasi akses.
+
+#### 3. PersistentVolume (03-pv.yml) ####
+
+PersistentVolume (PV) adalah resource storage di cluster. Pada contoh ini:
+
+* Kapasitas: 1Gi
+* Access mode: ReadWriteOnce (hanya bisa di-mount oleh satu node)
+* Storage class: manual
+* Type: hostPath (menggunakan folder di node, **tidak cocok untuk production**)
+
+#### 4. PersistentVolumeClaim (04-pvc.yml) ####
+
+PersistentVolumeClaim (PVC) adalah request storage oleh user/pod. Pod akan menggunakan PVC untuk mendapatkan akses ke PV.
+
+#### 5. Database Deployment & Service (05-database.yml) ####
+
+File ini berisi dua resource:
+
+**Deployment:**
+* Menjalankan PostgreSQL 17 Alpine
+* Mengambil konfigurasi dari ConfigMap dan Secret
+* Mount PVC ke `/var/lib/postgresql/data`
+
+**Service:**
+* Type: ClusterIP (hanya bisa diakses dari dalam cluster)
+* Port: 5432
+* Nama service: `db-belajar` (digunakan oleh aplikasi untuk koneksi)
+
+#### 6. Webapp Deployment & Service (06-webapp.yml) ####
+
+File ini berisi dua resource:
+
+**Deployment:**
+* Menjalankan aplikasi Spring Boot
+* Mengambil connection string dari ConfigMap
+* Connect ke database menggunakan nama service `db-belajar`
+
+**Service:**
+* Type: NodePort (bisa diakses dari luar cluster)
+* Port internal: 8080
+* NodePort: 30001 (port untuk akses dari luar)
+
+### Cara Deploy ke Kubernetes ###
+
+#### 1. Deploy semua resource sekaligus ####
+
+```bash
+kubectl apply -f k8s/
+```
+
+Kubernetes akan memproses file-file secara alfabetis, sehingga urutan sudah benar.
+
+#### 2. Deploy satu per satu (untuk pembelajaran) ####
+
+```bash
+# Step 1: Buat ConfigMap
+kubectl apply -f k8s/01-configmap.yml
+
+# Step 2: Buat Secret
+kubectl apply -f k8s/02-secret.yml
+
+# Step 3: Buat PersistentVolume
+kubectl apply -f k8s/03-pv.yml
+
+# Step 4: Buat PersistentVolumeClaim
+kubectl apply -f k8s/04-pvc.yml
+
+# Step 5: Deploy database
+kubectl apply -f k8s/05-database.yml
+
+# Step 6: Deploy aplikasi web
+kubectl apply -f k8s/06-webapp.yml
+```
+
+### Verifikasi Deployment ###
+
+#### 1. Cek status semua resource ####
+
+```bash
+# Cek semua pods
+kubectl get pods
+
+# Cek semua services
+kubectl get svc
+
+# Cek ConfigMap
+kubectl get configmap
+
+# Cek Secret
+kubectl get secret
+
+# Cek PV dan PVC
+kubectl get pv,pvc
+```
+
+#### 2. Lihat detail pod tertentu ####
+
+```bash
+kubectl describe pod <nama-pod>
+```
+
+#### 3. Lihat log aplikasi ####
+
+```bash
+# Log database
+kubectl logs deployment/db-belajar
+
+# Log aplikasi
+kubectl logs deployment/app-belajar
+
+# Follow log (terus update)
+kubectl logs -f deployment/app-belajar
+```
+
+#### 4. Lihat isi ConfigMap ####
+
+```bash
+kubectl get configmap belajar-config -o yaml
+```
+
+#### 5. Lihat isi Secret (terenkode base64) ####
+
+```bash
+kubectl get secret belajar-secret -o yaml
+```
+
+#### 6. Decode secret untuk melihat nilai asli ####
+
+```bash
+kubectl get secret belajar-secret -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d
+```
+
+### Mengakses Aplikasi ###
+
+#### 1. Menggunakan NodePort ####
+
+Aplikasi bisa diakses melalui NodePort 30001:
+
+```bash
+# Jika menggunakan minikube
+minikube service app-belajar
+
+# Atau akses manual
+# Dapatkan IP node
+kubectl get nodes -o wide
+
+# Akses melalui browser
+http://<node-ip>:30001/api/product
+```
+
+#### 2. Menggunakan Port Forward (alternatif) ####
+
+```bash
+kubectl port-forward service/app-belajar 10001:8080
+```
+
+Kemudian akses di [http://localhost:10001/api/product](http://localhost:10001/api/product)
+
+### Troubleshooting ###
+
+#### Pod tidak bisa start ####
+
+```bash
+# Lihat events untuk pod yang error
+kubectl describe pod <nama-pod>
+
+# Lihat log pod yang error
+kubectl logs <nama-pod>
+```
+
+#### Database tidak bisa diakses dari aplikasi ####
+
+```bash
+# Cek apakah service database sudah running
+kubectl get svc db-belajar
+
+# Test koneksi dari pod aplikasi
+kubectl exec -it deployment/app-belajar -- /bin/sh
+# Kemudian di dalam pod:
+ping db-belajar
+```
+
+#### PVC tidak bisa bind ke PV ####
+
+```bash
+# Cek status PVC
+kubectl get pvc
+
+# Cek detail PVC
+kubectl describe pvc postgres-pvc
+
+# Cek apakah ada PV yang available
+kubectl get pv
+```
+
+### Update Konfigurasi ###
+
+#### 1. Update ConfigMap ####
+
+```bash
+# Edit ConfigMap
+kubectl edit configmap belajar-config
+
+# Atau update dari file
+kubectl apply -f k8s/01-configmap.yml
+
+# Restart pod agar membaca konfigurasi baru
+kubectl rollout restart deployment/app-belajar
+kubectl rollout restart deployment/db-belajar
+```
+
+#### 2. Update Secret ####
+
+```bash
+# Edit Secret
+kubectl edit secret belajar-secret
+
+# Restart pod agar membaca secret baru
+kubectl rollout restart deployment/db-belajar
+```
+
+### Membersihkan Resource ###
+
+#### 1. Hapus semua resource sekaligus ####
+
+```bash
+kubectl delete -f k8s/
+```
+
+#### 2. Hapus satu per satu (reverse order) ####
+
+```bash
+kubectl delete -f k8s/06-webapp.yml
+kubectl delete -f k8s/05-database.yml
+kubectl delete -f k8s/04-pvc.yml
+kubectl delete -f k8s/03-pv.yml
+kubectl delete -f k8s/02-secret.yml
+kubectl delete -f k8s/01-configmap.yml
+```
+
+### Catatan Penting ###
+
+* **hostPath PV tidak cocok untuk production**. Gunakan storage provider yang proper seperti:
+  * Cloud provider storage (AWS EBS, GCP Persistent Disk, Azure Disk)
+  * Network storage (NFS, Ceph, GlusterFS)
+  * Storage class dengan dynamic provisioning
+
+* **Secret hanya di-encode, bukan di-encrypt**. Untuk production:
+  * Enable encryption at rest di cluster
+  * Gunakan external secret management (Vault, AWS Secrets Manager)
+  * Implement RBAC untuk membatasi akses
+
+* **Credentials hardcoded di YAML tidak aman**. Alternatif:
+  * Gunakan external secret operator
+  * Generate secret secara dynamic
+  * Inject credentials saat runtime

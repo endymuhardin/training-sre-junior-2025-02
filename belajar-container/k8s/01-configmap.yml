@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: belajar-config
+  labels:
+    app: belajar
+data:
+  # Database configuration
+  POSTGRES_DB: "belajar"
+  POSTGRES_USER: "belajar"
+
+  # Application configuration
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://db-belajar:5432/belajar"

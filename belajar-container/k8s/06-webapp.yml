@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-belajar
+  labels:
+    app: belajar-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: belajar-app
+  template:
+    metadata:
+      labels:
+        app: belajar-app
+    spec:
+      containers:
+      - name: app
+        image: endymuhardin/belajar-container:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: belajar-config
+              key: SPRING_DATASOURCE_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-belajar
+  labels:
+    app: belajar-app
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30001
+  selector:
+    app: belajar-app
