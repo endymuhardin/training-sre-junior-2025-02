@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Single HAProxy Load Balancer
+  haproxy:
+    image: haproxy:2.9-alpine
+    container_name: haproxy
+    ports:
+      - "8080:80"
+      - "8404:8404"  # HAProxy Stats
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - ha-net
+    depends_on:
+      - nginx1
+      - nginx2
+      - nginx3
+
+  # Nginx Backend Instances
+  nginx1:
+    image: nginx:alpine
+    container_name: nginx1
+    volumes:
+      - ./html/nginx1:/usr/share/nginx/html:ro
+    networks:
+      - ha-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  nginx2:
+    image: nginx:alpine
+    container_name: nginx2
+    volumes:
+      - ./html/nginx2:/usr/share/nginx/html:ro
+    networks:
+      - ha-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  nginx3:
+    image: nginx:alpine
+    container_name: nginx3
+    volumes:
+      - ./html/nginx3:/usr/share/nginx/html:ro
+    networks:
+      - ha-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+networks:
+  ha-net:
+    driver: bridge

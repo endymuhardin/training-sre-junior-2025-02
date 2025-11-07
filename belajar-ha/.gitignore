@@ -1,0 +1,21 @@
+# PostgreSQL data directories
+demo-2-stateful-ha/primary-data/
+demo-2-stateful-ha/replica1-data/
+demo-2-stateful-ha/replica2-data/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
