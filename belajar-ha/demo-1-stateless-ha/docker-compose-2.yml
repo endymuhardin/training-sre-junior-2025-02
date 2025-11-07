@@ -4,8 +4,11 @@ services:
     image: haproxy:2.9-alpine
     container_name: haproxy1
     hostname: haproxy1
+    user: root
     cap_add:
       - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - ./keepalived-master.conf:/etc/keepalived/keepalived.conf:ro
@@ -18,7 +21,7 @@ services:
       - nginx3
     command: >
       sh -c "apk add --no-cache keepalived &&
-             keepalived -f /etc/keepalived/keepalived.conf -D -l -n &&
+             keepalived -f /etc/keepalived/keepalived.conf -D -l &&
              haproxy -f /usr/local/etc/haproxy/haproxy.cfg"
 
   # HAProxy Backup Instance with Keepalived
@@ -26,8 +29,11 @@ services:
     image: haproxy:2.9-alpine
     container_name: haproxy2
     hostname: haproxy2
+    user: root
     cap_add:
       - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - ./keepalived-backup.conf:/etc/keepalived/keepalived.conf:ro
@@ -40,7 +46,7 @@ services:
       - nginx3
     command: >
       sh -c "apk add --no-cache keepalived &&
-             keepalived -f /etc/keepalived/keepalived.conf -D -l -n &&
+             keepalived -f /etc/keepalived/keepalived.conf -D -l &&
              haproxy -f /usr/local/etc/haproxy/haproxy.cfg"
 
   # Virtual IP Access Point

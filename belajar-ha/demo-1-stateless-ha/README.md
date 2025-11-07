@@ -2,6 +2,8 @@
 
 Demonstrasi High Availability pada stateless layer menggunakan HAProxy dan Nginx.
 
+> **Catatan**: Demo ini memiliki 2 bagian (Part 1 dan Part 2) yang menggunakan compose file berbeda. Keduanya **tidak dijalankan bersamaan** - pilih salah satu sesuai konsep yang ingin dipelajari.
+
 ## Arsitektur
 
 ### Part 1: Application Layer HA (docker-compose-1.yml)
@@ -57,6 +59,11 @@ Demonstrasi High Availability pada stateless layer menggunakan HAProxy dan Nginx
 - **Active-Passive HA**: Master/Backup configuration
 - **Automatic Promotion**: Backup menjadi master saat master down
 - **Split-Brain Prevention**: Authentication dan priority
+
+### Shared Configuration
+- Kedua part menggunakan **`haproxy.cfg` yang sama**
+- Konfigurasi DNS resolver mendukung network dari kedua compose file
+- Ini memudahkan maintenance karena satu file config untuk semua scenario
 
 ---
 
@@ -166,16 +173,30 @@ docker start nginx2
 
 ```bash
 docker compose -f docker-compose-1.yml down
+
+# Atau untuk Podman
+podman compose -f docker-compose-1.yml down
 ```
+
+> **Penting**: Pastikan Part 1 sudah di-cleanup sebelum menjalankan Part 2 untuk menghindari konflik port dan network.
 
 ---
 
 ## Part 2: Full Stack HA (HAProxy + Keepalived)
 
+> **Penting**:
+> - Part 2 menggunakan haproxy.cfg yang sama dengan Part 1, sehingga semua catatan tentang [Container Runtime Quirks](#container-runtime-quirks) juga berlaku di sini
+> - Konfigurasi sudah disesuaikan untuk mendukung kedua network (compose-1 dan compose-2)
+> - **Jangan jalankan Part 1 dan Part 2 bersamaan** - pilih salah satu
+
 ### 1. Jalankan Environment
 
 ```bash
+# For Docker
 docker compose -f docker-compose-2.yml up -d
+
+# For Podman
+podman compose -f docker-compose-2.yml up -d
 ```
 
 ### 2. Verifikasi VIP Setup
@@ -304,7 +325,12 @@ docker exec haproxy2 sh -c "echo 'show stat' | socat stdio /var/run/haproxy.sock
 
 ```bash
 docker compose -f docker-compose-2.yml down
+
+# Atau untuk Podman
+podman compose -f docker-compose-2.yml down
 ```
+
+> **Catatan**: Setelah cleanup Part 2, Anda bisa kembali menjalankan Part 1 jika diperlukan.
 
 ---
 
@@ -395,15 +421,36 @@ resolvers docker
 
 **Cara Mencari DNS Server Podman Anda**:
 ```bash
-# Cek resolv.conf di container HAProxy
+# Untuk compose-1 (network default)
 podman exec haproxy cat /etc/resolv.conf
 # Output:
 # search dns.podman
-# nameserver 10.89.4.1    <-- Gunakan IP ini
+# nameserver 10.89.4.1    <-- DNS server untuk compose-1
+
+# Untuk compose-2 (network 172.20.0.0/16)
+podman exec haproxy1 cat /etc/resolv.conf
+# Output:
+# search dns.podman
+# nameserver 172.20.0.1   <-- DNS server untuk compose-2
 
 # Atau inspect network
 podman network inspect demo-1-stateless-ha_ha-net | grep gateway
 ```
+
+**Catatan untuk Multiple Compose Files**:
+Karena compose-1 dan compose-2 menggunakan network berbeda tetapi haproxy.cfg yang sama, konfigurasi resolver menggunakan **multiple nameservers** (haproxy.cfg:8-9):
+```haproxy
+resolvers docker
+    nameserver dns1 10.89.4.1:53    # Untuk compose-1
+    nameserver dns2 172.20.0.1:53   # Untuk compose-2
+```
+
+**Catatan Penting**:
+- compose-1 dan compose-2 **tidak dijalankan bersamaan** (satu demo per waktu)
+- HAProxy akan otomatis menggunakan DNS server yang available/merespons
+- Ketika compose-1 jalan, dns1 (10.89.4.1) akan merespons, dns2 akan timeout (normal)
+- Ketika compose-2 jalan, dns2 (172.20.0.1) akan merespons, dns1 akan timeout (normal)
+- Timeout dari DNS server yang tidak aktif tidak mempengaruhi resolusi karena ada fallback
 
 **Gejala Konfigurasi DNS Salah**:
 - Semua backend masuk mode **MAINT** (maintenance)
