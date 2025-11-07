@@ -3,12 +3,7 @@
 # Script to promote a replica to primary (manual failover)
 # Run this from INSIDE psql-client container
 
-REPLICA_NAME=${1:-postgres-replica1}
-
-if [ "$REPLICA_NAME" != "postgres-replica1" ] && [ "$REPLICA_NAME" != "postgres-replica2" ]; then
-    echo "Usage: $0 [postgres-replica1|postgres-replica2]"
-    exit 1
-fi
+REPLICA_NAME="postgres-replica1"
 
 echo "=========================================="
 echo "Manual Failover: Promote $REPLICA_NAME"
@@ -43,12 +38,11 @@ echo "Step 5: Test write capability..."
 psql -h $REPLICA_NAME -d demodb -c "INSERT INTO users (name, email) VALUES ('AfterFailover_$(date +%s)', 'failover@example.com') RETURNING id, name, created_at;"
 
 echo ""
-echo "Step 6: Create replication slots..."
+echo "Step 6: Create replication slot..."
 psql -h $REPLICA_NAME -d postgres -c "SELECT pg_create_physical_replication_slot('replica1_slot');" 2>/dev/null || echo "replica1_slot already exists"
-psql -h $REPLICA_NAME -d postgres -c "SELECT pg_create_physical_replication_slot('replica2_slot');" 2>/dev/null || echo "replica2_slot already exists"
 
 echo ""
-echo "Step 7: Verify replication slots..."
+echo "Step 7: Verify replication slot..."
 psql -h $REPLICA_NAME -d postgres -c "SELECT slot_name, active FROM pg_replication_slots;"
 
 echo ""
@@ -59,5 +53,5 @@ echo ""
 echo "IMPORTANT: Update application to connect to new primary"
 echo "New primary hostname: $REPLICA_NAME"
 echo ""
-echo "Replication slots created for future replicas"
+echo "Replication slot created for old primary to rejoin"
 echo ""

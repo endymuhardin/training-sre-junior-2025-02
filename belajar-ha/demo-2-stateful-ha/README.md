@@ -7,42 +7,33 @@ Demonstrasi High Availability pada stateful layer menggunakan PostgreSQL Streami
 ## Arsitektur
 
 ```
-     ┌─────────────────────────────────┐
-     │       PgBouncer (Optional)      │
-     │      Connection Pooler          │
-     │         Port 6432               │
-     └────────────┬────────────────────┘
-                  │
-                  │ Writes
-     ┌────────────▼────────────┐
-     │   PostgreSQL Primary    │  ◄───┐
-     │      Read/Write         │      │
-     │      Port 5432          │      │ Streaming
-     └─────────────┬───────────┘      │ Replication
-                   │                  │
-         ┌─────────┼─────────┐        │
-         │ Reads   │         │        │
-         │         │         │        │
-     ┌───▼────┐ ┌──▼─────┐  │        │
-     │Replica1│ │Replica2│  │        │
-     │  Read  │ │  Read  │──┼────────┘
-     │  5433  │ │  5434  │  │
-     └────────┘ └────────┘  │
-                             │
-                      Physical Replication
-                      (WAL Streaming)
+     ┌────────────────────────┐
+     │   PostgreSQL Primary   │  ◄───┐
+     │      Read/Write        │      │
+     │      Port 5432         │      │ Streaming
+     └──────────┬─────────────┘      │ Replication
+                │                    │
+                │ Reads              │
+                │                    │
+            ┌───▼────┐               │
+            │Replica1│───────────────┘
+            │  Read  │
+            │  5433  │
+            └────────┘
+
+         Physical Replication
+          (WAL Streaming)
 ```
 
 ## Konsep HA yang Didemonstrasikan
 
 ### Core Concepts:
-- **Streaming Replication**: WAL (Write-Ahead Log) streaming ke replicas
-- **Hot Standby**: Replicas dapat melayani read queries
+- **Streaming Replication**: WAL (Write-Ahead Log) streaming ke replica
+- **Hot Standby**: Replica dapat melayani read queries
 - **Replication Slots**: Prevent WAL deletion sebelum replica consume
-- **Asynchronous Replication**: Replicas bisa sedikit lag behind primary
-- **Read Scaling**: Distribute read load ke multiple replicas
+- **Asynchronous Replication**: Replica bisa sedikit lag behind primary
+- **Read Scaling**: Offload read queries ke replica
 - **Manual Failover**: Promote replica menjadi primary
-- **Connection Pooling**: Efficient connection management dengan PgBouncer
 
 ### Data Durability:
 - **Replication Lag**: Monitor keterlambatan replica
@@ -142,8 +133,7 @@ FROM pg_replication_slots;
   ├── pg_hba.conf             # Authentication
   ├── pg_wal/                 # WAL files
   ├── pg_replslot/            # Replication slots
-  │   ├── replica1_slot/
-  │   └── replica2_slot/
+  │   └── replica1_slot/
   └── base/                   # Database files
 ```
 
@@ -160,25 +150,23 @@ FROM pg_replication_slots;
 ```
 ./test-replication.sh         # Automated tests
 ./generate-load.sh            # Load generator
-./promote-replica.sh          # Promote from HOST
-./promote-replica-client.sh   # Promote from psql-client
+./promote-replica-client.sh   # Promote replica to primary
 ```
 
 ### Manual Promotion Methods
 
-**Method 1 - Using pg_promote() (PostgreSQL 12+):**
+Semua promotion dilakukan dari dalam psql-client container:
+
+**Method 1 - Using Script:**
+```bash
+# From psql-client
+./promote-replica-client.sh
+```
+
+**Method 2 - Using pg_promote() (PostgreSQL 12+):**
 ```sql
 -- From psql-client
 psql -h postgres-replica1 -d postgres -c "SELECT pg_promote();"
-```
-
-**Method 2 - Using Scripts:**
-```bash
-# From HOST
-./promote-replica.sh postgres-replica1
-
-# From psql-client
-./promote-replica-client.sh postgres-replica1
 ```
 
 ### Re-joining Old Primary as Replica
@@ -192,12 +180,10 @@ Setelah failover, **role berubah tapi nama container tidak**:
 ```
 SEBELUM Failover:
   postgres-primary (PRIMARY - Write)
-    ├─> postgres-replica1 (REPLICA - Read)
-    └─> postgres-replica2 (REPLICA - Read)
+    └─> postgres-replica1 (REPLICA - Read)
 
 SETELAH Failover:
   postgres-replica1 (PRIMARY - Write) ← NEW PRIMARY!
-    └─> postgres-replica2 (REPLICA - Read)
 
 SETELAH Re-join:
   postgres-replica1 (PRIMARY - Write)
@@ -276,54 +262,15 @@ INSERT INTO users (name, email) VALUES ('Test', 'test@example.com');
 ```
 Before Failover:
   postgres-primary (P) → postgres-replica1 (R)
-                      → postgres-replica2 (R)
 
 After Failover + Re-join:
   postgres-replica1 (P) → postgres-primary (R)   ← Old primary, now replica!
-                       → postgres-replica2 (R)
 
 Note: (P) = PRIMARY, (R) = REPLICA
       Container names sama, ROLES berubah!
 ```
 
 > **Praktik:** Lihat [QUICKSTART.md - Demo 4b](QUICKSTART.md#demo-4b-re-join-old-primary-as-replica) untuk step-by-step commands
-
----
-
-## Demo Notes
-
-### Simplifying Failover Demo
-
-Untuk mempermudah demonstrasi failover dan re-join, **disarankan stop postgres-replica2** sebelum Demo 4:
-
-```bash
-docker stop postgres-replica2
-# atau: podman stop postgres-replica2
-```
-
-**Alasan:**
-1. Fokus demo ke failover primary → replica1 saja
-2. Menghindari error logs dari replica2 yang mencari replication slot tidak ada
-3. Simplify topology: hanya 2 nodes (primary ↔ replica1)
-4. Lebih mudah memahami role reversal
-
-**Setelah failover:**
-- postgres-replica2 akan error karena mencari slot di postgres-primary (sudah offline)
-- postgres-replica2 tidak otomatis switch ke postgres-replica1 (manual reconfiguration needed)
-- Untuk production, gunakan automatic failover tools (Patroni, repmgr)
-
-**Jika ingin rejoin postgres-replica2:**
-Sama seperti postgres-primary, perlu rebuild:
-```bash
-rm -rf data/replica2/*
-podman run --rm --network demo-2-stateful-ha_postgres-net \
-  -v $(pwd)/data/replica2:/var/lib/postgresql/data \
-  -e PGPASSWORD=replicator123 \
-  postgres:17-alpine \
-  pg_basebackup -h postgres-replica1 -D /var/lib/postgresql/data \
-  -U replicator -v -P -W -R -X stream
-podman start postgres-replica2
-```
 
 ---
 
@@ -541,7 +488,7 @@ SELECT pg_reload_conf();
 SELECT EXTRACT(EPOCH FROM replay_lag) > 10 FROM pg_stat_replication;
 
 # Alert if replica disconnected
-SELECT count(*) < 2 FROM pg_stat_replication WHERE state = 'streaming';
+SELECT count(*) < 1 FROM pg_stat_replication WHERE state = 'streaming';
 
 # Alert if WAL retention too high (disk space)
 SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) > 10737418240
@@ -611,7 +558,6 @@ docker compose down
 - Explore **Patroni** for automatic PostgreSQL failover
 - Learn **pgBackRest** for advanced backup/restore
 - Study **Logical Replication** for multi-master scenarios
-- Implement **Connection Pooling** strategies
 - Setup **Monitoring with Prometheus + Grafana**
 
 ---
@@ -621,5 +567,4 @@ docker compose down
 - [PostgreSQL Replication Documentation](https://www.postgresql.org/docs/current/runtime-config-replication.html)
 - [PostgreSQL High Availability](https://www.postgresql.org/docs/current/high-availability.html)
 - [Patroni Documentation](https://patroni.readthedocs.io/)
-- [PgBouncer Documentation](https://www.pgbouncer.org/)
 - [Understanding WAL](https://www.postgresql.org/docs/current/wal-intro.html)

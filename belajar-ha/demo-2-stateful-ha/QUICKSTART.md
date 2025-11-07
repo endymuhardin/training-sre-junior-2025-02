@@ -34,10 +34,10 @@ podman exec -it psql-client sh
 ```
 
 **Check hasil:**
-- ✅ Test 1: Primary shows 2 connected replicas (state = streaming)
-- ✅ Test 2: `pg_is_in_recovery()` → Primary: f, Replicas: t
+- ✅ Test 1: Primary shows 1 connected replica (state = streaming)
+- ✅ Test 2: `pg_is_in_recovery()` → Primary: f, Replica: t
 - ✅ Test 3: Insert di primary berhasil
-- ✅ Test 4: Data muncul di replicas dalam < 2 detik
+- ✅ Test 4: Data muncul di replica dalam < 2 detik
 - ✅ Test 5: Write ke replica ditolak dengan error "read-only"
 - ✅ Test 6: Replication lag = 0 bytes
 
@@ -55,16 +55,12 @@ psql -h postgres-primary -d demodb -c \
 # Read from replica1
 psql -h postgres-replica1 -d demodb -c \
   "SELECT * FROM users ORDER BY id DESC LIMIT 5;"
-
-# Read from replica2
-psql -h postgres-replica2 -d demodb -c \
-  "SELECT * FROM users ORDER BY id DESC LIMIT 5;"
 ```
 
 **Check hasil:**
-- Data yang baru di-insert muncul di semua replicas
+- Data yang baru di-insert muncul di replica
 - Latency < 1 detik
-- Semua replicas menunjukkan data yang sama
+- Replica menunjukkan data yang sama dengan primary
 
 ---
 
@@ -73,19 +69,19 @@ psql -h postgres-replica2 -d demodb -c \
 **Terminal: psql-client**
 
 ```bash
-# Distribute read load ke replicas
+# Distribute read load ke replica
 for i in {1..10}; do
   echo "=== Read $i ==="
   psql -h postgres-replica1 -d demodb -c "SELECT COUNT(*) FROM users;" -t
-  psql -h postgres-replica2 -d demodb -c "SELECT COUNT(*) FROM users;" -t
   sleep 1
 done
 ```
 
 **Check hasil:**
-- Kedua replica mengembalikan count yang sama
+- Replica mengembalikan count yang konsisten
 - Query berhasil tanpa error
-- Primary tidak di-query (load terdistribusi ke replicas)
+- Primary tidak di-query (read load offloaded ke replica)
+- Dalam production, gunakan multiple replicas dengan load balancer
 
 ---
 
@@ -105,7 +101,7 @@ watch -n1 'psql -h postgres-primary -d postgres -c "SELECT application_name, sta
 ```
 
 **Check hasil (Terminal 2):**
-- `state` menunjukkan "streaming" untuk kedua replica
+- `state` menunjukkan "streaming" untuk replica
 - `replay_lag` biasanya < 100ms atau "00:00:00"
 - Lag mungkin sedikit naik saat load tinggi, tapi catch up cepat
 - Jika lag terus naik → ada masalah (network/disk/CPU)
@@ -113,16 +109,6 @@ watch -n1 'psql -h postgres-primary -d postgres -c "SELECT application_name, sta
 ---
 
 ## Demo 4: Manual Failover
-
-**Preparation (HOST):** Stop replica2 untuk simplify demo
-
-```bash
-# Stop replica2 agar fokus ke failover primary -> replica1 saja
-docker stop postgres-replica2
-
-# For Podman:
-podman stop postgres-replica2
-```
 
 **Setup - 3 Terminals:**
 
@@ -146,16 +132,13 @@ docker stop postgres-primary
 
 # Wait 5 seconds, observe Terminal 1 errors
 
-# 2. Promote replica1 (choose one method):
+# 2. Promote replica1 to new primary
+# Switch ke Terminal 2 (psql-client), stop watch (Ctrl+C), lalu pilih salah satu:
 
-# Method A - Script dari HOST:
-./promote-replica.sh postgres-replica1
+# Method A - Using script:
+./promote-replica-client.sh
 
-# Method B - Script dari psql-client:
-# (run in Terminal 2 after stopping watch)
-./promote-replica-client.sh postgres-replica1
-
-# Method C - Manual SQL dari psql-client:
+# Method B - Manual SQL:
 psql -h postgres-replica1 -d postgres -c "SELECT pg_promote();"
 sleep 3
 psql -h postgres-replica1 -d postgres -c "SELECT pg_is_in_recovery();"  # Should return 'f'
@@ -169,11 +152,9 @@ psql -h postgres-replica1 -d postgres -c "SELECT pg_is_in_recovery();"  # Should
 psql -h postgres-replica1 -d demodb -c \
   "INSERT INTO users (name, email) VALUES ('AfterFailover', 'test@example.com') RETURNING *;"
 
-# Create replication slots di new primary (IMPORTANT!)
+# Create replication slot di new primary (IMPORTANT!)
 psql -h postgres-replica1 -d postgres -c \
   "SELECT pg_create_physical_replication_slot('replica1_slot');"
-psql -h postgres-replica1 -d postgres -c \
-  "SELECT pg_create_physical_replication_slot('replica2_slot');"
 ```
 
 **Metrics:**
@@ -187,9 +168,9 @@ psql -h postgres-replica1 -d postgres -c \
 psql -h postgres-replica1 -d postgres -c "SELECT pg_is_in_recovery();"
 # Expected: f (false = primary)
 
-# Verify replication slots created
+# Verify replication slot created
 psql -h postgres-replica1 -d postgres -c "SELECT slot_name, active FROM pg_replication_slots;"
-# Expected: replica1_slot and replica2_slot (active = f for now)
+# Expected: replica1_slot (active = f for now, will be active after old primary rejoins)
 
 # Test write
 psql -h postgres-replica1 -d demodb -c "SELECT COUNT(*) FROM users;"
@@ -351,37 +332,6 @@ watch -n0.5 'psql -h postgres-primary -d postgres -c "SELECT application_name, p
 - Setelah load selesai, lag turun kembali ke 0 bytes
 - Replica catch up otomatis
 - Time to catch up bergantung pada disk I/O dan network
-
----
-
-## Demo 6: Connection Pooling (PgBouncer)
-
-**Terminal: psql-client**
-
-```bash
-# Connect via PgBouncer
-psql -h pgbouncer -p 5432 -d demodb -c "SELECT * FROM users LIMIT 5;"
-
-# Check pool stats
-psql -h pgbouncer -p 5432 -d pgbouncer -c "SHOW POOLS;"
-psql -h pgbouncer -p 5432 -d pgbouncer -c "SHOW STATS;"
-```
-
-**Check hasil:**
-- Query berhasil (data sama dengan direct ke postgres-primary)
-- `SHOW POOLS`: Lihat `cl_active` (client connections) vs `sv_active` (server connections ke PostgreSQL)
-- Server connections jauh lebih sedikit dari client connections (pooling works!)
-- `SHOW STATS`: Lihat total requests, queries, transactions
-
-**Expected:**
-```
- database | cl_active | sv_active | sv_idle
-----------+-----------+-----------+---------
- demodb   | 1         | 1         | 4
-
-# Client connections: 1 (your query)
-# Server connections: 5 total (1 active + 4 idle pool)
-```
 
 ---
 

@@ -32,14 +32,13 @@ echo "=========================================="
 
 run_query "postgres-primary" "5432" "SELECT client_addr, application_name, state, sync_state FROM pg_stat_replication;" "PRIMARY"
 
-# Test 2: Check if replicas are in recovery mode
+# Test 2: Check if replica is in recovery mode
 echo "=========================================="
 echo "Test 2: Recovery Status"
 echo "=========================================="
 
 run_query "postgres-primary" "5432" "SELECT pg_is_in_recovery();" "PRIMARY"
 run_query "postgres-replica1" "5432" "SELECT pg_is_in_recovery();" "REPLICA1"
-run_query "postgres-replica2" "5432" "SELECT pg_is_in_recovery();" "REPLICA2"
 
 # Test 3: Insert data on primary
 echo "=========================================="
@@ -49,15 +48,14 @@ echo "=========================================="
 NEW_NAME="User_$(date +%s)"
 run_query "postgres-primary" "5432" "INSERT INTO users (name, email) VALUES ('$NEW_NAME', '$NEW_NAME@example.com'); SELECT * FROM users ORDER BY id DESC LIMIT 1;" "PRIMARY"
 
-# Test 4: Read from replicas (should see new data)
+# Test 4: Read from replica (should see new data)
 echo "=========================================="
-echo "Test 4: Read from Replicas (Lag Check)"
+echo "Test 4: Read from Replica (Lag Check)"
 echo "=========================================="
 
 sleep 2  # Give replication time to catch up
 
 run_query "postgres-replica1" "5432" "SELECT COUNT(*) as total_users, MAX(created_at) as latest_user FROM users;" "REPLICA1"
-run_query "postgres-replica2" "5432" "SELECT COUNT(*) as total_users, MAX(created_at) as latest_user FROM users;" "REPLICA2"
 
 # Test 5: Try to write to replica (should fail)
 echo "=========================================="

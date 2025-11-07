@@ -1,12 +1,7 @@
 #!/bin/bash
 set -e
 
-REPLICA_SLOT=""
-if [ "$HOSTNAME" = "postgres-replica1" ]; then
-    REPLICA_SLOT="replica1_slot"
-elif [ "$HOSTNAME" = "postgres-replica2" ]; then
-    REPLICA_SLOT="replica2_slot"
-fi
+REPLICA_SLOT="replica1_slot"
 
 # Check if already configured as replica
 if [ -f "$PGDATA/standby.signal" ]; then

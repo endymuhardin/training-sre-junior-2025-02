@@ -4,12 +4,7 @@ set -e
 # This script runs when replica container starts
 # It uses pg_basebackup to create a replica from primary
 
-REPLICA_SLOT=""
-if [ "$HOSTNAME" = "postgres-replica1" ]; then
-    REPLICA_SLOT="replica1_slot"
-elif [ "$HOSTNAME" = "postgres-replica2" ]; then
-    REPLICA_SLOT="replica2_slot"
-fi
+REPLICA_SLOT="replica1_slot"
 
 # Wait for primary to be ready
 until pg_isready -h postgres-primary -U postgres; do

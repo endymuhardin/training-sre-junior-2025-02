@@ -19,9 +19,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
         ('Bob', 'bob@example.com'),
         ('Charlie', 'charlie@example.com');
 
-    -- Create replication slot for each replica
+    -- Create replication slot for replica
     SELECT pg_create_physical_replication_slot('replica1_slot');
-    SELECT pg_create_physical_replication_slot('replica2_slot');
 
     GRANT ALL PRIVILEGES ON DATABASE demodb TO postgres;
     GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;
