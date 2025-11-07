@@ -2,6 +2,8 @@
 
 Demonstrasi High Availability pada stateful layer menggunakan PostgreSQL Streaming Replication.
 
+> 📖 **Documentation:** Untuk copy-paste commands & demo praktis, lihat **[QUICKSTART.md](QUICKSTART.md)**
+
 ## Arsitektur
 
 ```
@@ -50,255 +52,315 @@ Demonstrasi High Availability pada stateful layer menggunakan PostgreSQL Streami
 
 ---
 
-## Prerequisites
+## Implementation Details
 
-```bash
-# Install PostgreSQL client tools (for testing scripts)
-# macOS
-brew install postgresql
+### Configuration Files & Locations
 
-# Ubuntu/Debian
-sudo apt-get install postgresql-client
-
-# Or use Docker exec for all queries
+**Primary Configuration (`docker-compose.yml`):**
+```yaml
+postgres-primary:
+  command: >
+    postgres
+    -c wal_level=replica              # Enable WAL for replication
+    -c hot_standby=on                 # Allow read queries on standby
+    -c max_wal_senders=10             # Max concurrent WAL sender (1 per replica + spare)
+    -c max_replication_slots=10       # Max replication slots
+    -c hot_standby_feedback=on        # Prevent query conflicts
 ```
 
----
-
-## Setup & Startup
-
-### 1. Start All Services
-
+**Replica Startup (`start-replica.sh`):**
 ```bash
-docker compose up -d
+# Clone from primary using pg_basebackup
+PGPASSWORD=postgres pg_basebackup \
+    -h postgres-primary \              # Primary hostname
+    -D $PGDATA \                       # Target directory
+    -U postgres \                      # User with REPLICATION privilege
+    -R \                               # Write recovery config automatically
+    -X stream \                        # Stream WAL during backup
+    -S replica1_slot                   # Use replication slot
 ```
 
-### 2. Wait for Initialization (Important!)
-
-Replicas need time to clone primary and start replication:
-
+**Generated Files in Replica:**
 ```bash
-# Watch logs
-docker compose logs -f
+# /var/lib/postgresql/data/standby.signal
+# Empty file marking this as standby
 
-# Check status
-docker compose ps
-
-# Wait until all services show "healthy"
-watch -n2 docker compose ps
+# /var/lib/postgresql/data/postgresql.auto.conf
+primary_conninfo = 'host=postgres-primary port=5432 user=replicator password=replicator123'
+primary_slot_name = 'replica1_slot'
+hot_standby = on
 ```
 
-**Expected startup time**: 30-60 seconds
+**Authentication (`pg_hba.conf`):**
+```conf
+# Allow replication connections
+host    replication     replicator      0.0.0.0/0               md5
 
-### 3. Verify Replication Setup
-
-```bash
-# Run automated test
-./test-replication.sh
+# Allow regular connections
+host    all             all             0.0.0.0/0               md5
 ```
 
-**Expected output**:
-- Primary shows 2 connected replicas
-- Replicas show `pg_is_in_recovery() = true`
-- Data inserted on primary appears on replicas
-- Write to replica fails (read-only)
+### Key Monitoring Queries
 
----
-
-## Demo Scenarios
-
-### Demo 1: Basic Replication Test
-
-**Verify replication is working:**
-
-```bash
-# Terminal 1: Insert data on primary
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d demodb -c \
-  "INSERT INTO users (name, email) VALUES ('DemoUser', 'demo@example.com') RETURNING *;"
-
-# Terminal 2: Read from replica1
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d demodb -c \
-  "SELECT * FROM users ORDER BY id DESC LIMIT 5;"
-
-# Terminal 3: Read from replica2
-PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d demodb -c \
-  "SELECT * FROM users ORDER BY id DESC LIMIT 5;"
+**Check Replication Status (Primary):**
+```sql
+SELECT
+    application_name,
+    client_addr,
+    state,                        -- streaming/catchup/startup
+    sync_state,                   -- async/sync
+    replay_lag                    -- Replication delay
+FROM pg_stat_replication;
 ```
 
-**Observasi**: Data muncul di replicas dalam < 1 detik
+**Check Recovery Status (Replica):**
+```sql
+-- Returns: t = replica, f = primary
+SELECT pg_is_in_recovery();
 
----
-
-### Demo 2: Read Scaling
-
-**Scenario**: Distribute read load ke replicas untuk performance.
-
-```bash
-# Create load on replicas (read-only queries)
-for i in {1..20}; do
-  echo "Read $i from replica1:"
-  PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d demodb -c \
-    "SELECT COUNT(*) FROM users;" -t
-
-  echo "Read $i from replica2:"
-  PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d demodb -c \
-    "SELECT COUNT(*) FROM users;" -t
-
-  sleep 0.5
-done
+-- Replication lag
+SELECT now() - pg_last_xact_replay_timestamp() AS lag;
 ```
 
-**Production pattern**: Application directs:
-- Writes → Primary (5432)
-- Reads → Replicas (5433, 5434) dengan load balancing
-
----
-
-### Demo 3: Replication Lag Monitoring
-
-**Monitor lag real-time:**
-
-```bash
-# Terminal 1: Generate continuous writes
-./generate-load.sh 120 2
-
-# Terminal 2: Monitor replication lag
-watch -n1 'docker exec postgres-primary psql -U postgres -c "SELECT application_name, state, sync_state, replay_lag FROM pg_stat_replication;"'
-
-# Terminal 3: Monitor replica lag from replica side
-watch -n1 'docker exec postgres-replica1 psql -U postgres -c "SELECT now() - pg_last_xact_replay_timestamp() AS replication_lag;"'
+**Check Replication Slots (Primary):**
+```sql
+SELECT
+    slot_name,
+    active,                       -- t = connected
+    pg_size_pretty(
+        pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)
+    ) AS retained_wal             -- WAL retained for this slot
+FROM pg_replication_slots;
 ```
 
-**Observasi**:
-- Lag biasanya < 100ms dalam kondisi normal
-- Lag increases jika replica overloaded atau network slow
-- `sync_state = async` (asynchronous replication)
+### File Locations
 
----
-
-### Demo 4: Primary Failure - Manual Failover
-
-**Scenario**: Primary mati, promote replica1 menjadi primary baru.
-
-**Setup:**
-
-```bash
-# Terminal 1: Generate continuous load (will fail when primary dies)
-./generate-load.sh 300 2
-
-# Terminal 2: Monitor replication status
-watch -n1 'docker exec postgres-primary psql -U postgres -c "SELECT * FROM pg_stat_replication;" 2>/dev/null || echo "PRIMARY DOWN"'
-
-# Terminal 3: Execute failover steps
+**Primary:**
+```
+/var/lib/postgresql/data/
+  ├── postgresql.conf          # Main config
+  ├── pg_hba.conf             # Authentication
+  ├── pg_wal/                 # WAL files
+  ├── pg_replslot/            # Replication slots
+  │   ├── replica1_slot/
+  │   └── replica2_slot/
+  └── base/                   # Database files
 ```
 
-**Failover Steps (Terminal 3):**
+**Replica:**
+```
+/var/lib/postgresql/data/
+  ├── standby.signal          # Standby mode marker
+  ├── postgresql.auto.conf    # Auto-generated config
+  ├── pg_wal/                 # Streamed WAL files
+  └── base/                   # Replicated data
+```
 
+**Scripts (mounted to `/workspace`):**
+```
+./test-replication.sh         # Automated tests
+./generate-load.sh            # Load generator
+./promote-replica.sh          # Promote from HOST
+./promote-replica-client.sh   # Promote from psql-client
+```
+
+### Manual Promotion Methods
+
+**Method 1 - Using pg_promote() (PostgreSQL 12+):**
+```sql
+-- From psql-client
+psql -h postgres-replica1 -d postgres -c "SELECT pg_promote();"
+```
+
+**Method 2 - Using Scripts:**
 ```bash
-# 1. Simulate primary failure
-docker stop postgres-primary
-
-# 2. Wait 5 seconds, observe load generator errors
-
-# 3. Promote replica1 to primary
+# From HOST
 ./promote-replica.sh postgres-replica1
 
-# 4. Verify replica1 is now accepting writes
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d demodb -c \
-  "INSERT INTO users (name, email) VALUES ('AfterFailover', 'after@example.com') RETURNING *;"
-
-# 5. Update application to connect to new primary (port 5433)
-# In production: Update DNS, load balancer, or connection string
+# From psql-client
+./promote-replica-client.sh postgres-replica1
 ```
 
-**Observasi**:
-- Downtime: ~10-30 seconds (time to detect + promote)
-- Data loss: Transactions yang belum replicated (RPO = replication lag)
-- Manual intervention required
+### Re-joining Old Primary as Replica
 
-**Recovery Point Objective (RPO)**: ~1-5 seconds (replication lag)
-**Recovery Time Objective (RTO)**: ~30 seconds (manual process)
+Setelah failover, old primary perlu di-rejoin ke cluster sebagai replica baru.
 
----
+**Konsep Role Reversal:**
 
-### Demo 5: Replication Lag Under Load
+Setelah failover, **role berubah tapi nama container tidak**:
 
-**Scenario**: Stress test replication dengan heavy writes.
+```
+SEBELUM Failover:
+  postgres-primary (PRIMARY - Write)
+    ├─> postgres-replica1 (REPLICA - Read)
+    └─> postgres-replica2 (REPLICA - Read)
 
-```bash
-# Terminal 1: Heavy write load
-for i in {1..1000}; do
-  PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d demodb -c \
-    "INSERT INTO users (name, email) SELECT 'bulk_'||generate_series, 'bulk_'||generate_series||'@example.com' FROM generate_series(1, 100);" &
+SETELAH Failover:
+  postgres-replica1 (PRIMARY - Write) ← NEW PRIMARY!
+    └─> postgres-replica2 (REPLICA - Read)
 
-  if [ $((i % 10)) -eq 0 ]; then wait; fi
-done
-wait
-
-# Terminal 2: Monitor lag continuously
-watch -n0.5 'docker exec postgres-primary psql -U postgres -c "SELECT application_name, pg_size_pretty(pg_wal_lsn_diff(sent_lsn, replay_lsn)) AS lag FROM pg_stat_replication;"'
+SETELAH Re-join:
+  postgres-replica1 (PRIMARY - Write)
+    └─> postgres-primary (REPLICA - Read) ← OLD PRIMARY, sekarang replica!
 ```
 
-**Observasi**: Lag increases during heavy load, catches up after load decreases.
+**Key Points:**
+- Container names **tidak berubah** (masih postgres-primary, postgres-replica1)
+- Container **roles berubah** (primary ↔ replica)
+- Aplikasi harus **update connection** dari postgres-primary ke postgres-replica1
+- Old primary memiliki data yang **diverged** dari new primary
+- **Tidak bisa** langsung start old primary (akan menjadi split-brain: 2 primaries!)
+- **Harus** rebuild old primary dengan fresh copy dari new primary
 
----
+**Process:**
 
-### Demo 6: Split-Brain Prevention
+1. **Stop old primary** (prevent split-brain)
+2. **Remove old data** (diverged data)
+3. **Clone dari new primary** (pg_basebackup)
+4. **Configure sebagai standby** (primary_conninfo → new primary)
+5. **Start sebagai replica**
+6. **Verify role reversal** (old primary sekarang read-only)
 
-**Scenario**: Demonstrate why we need fencing.
+**Implementation:**
 
 ```bash
-# 1. Start with healthy cluster
-docker compose ps
-
-# 2. Stop primary (simulating network partition)
+# 1. Stop old primary
 docker stop postgres-primary
 
-# 3. Promote replica1
-./promote-replica.sh postgres-replica1
+# 2. Remove diverged data
+rm -rf data/primary/*
 
-# 4. Restart old primary (DON'T DO THIS IN PRODUCTION!)
+# 3. Clone from new primary (replica1)
+PGPASSWORD=replicator123 pg_basebackup -h postgres-replica1 -D data/primary -U replicator -R -X stream
+
+# 4. Create standby.signal
+touch data/primary/standby.signal
+
+# 5. Configure primary_conninfo
+echo "primary_conninfo = 'host=postgres-replica1 ...'" >> data/primary/postgresql.auto.conf
+
+# 6. Start sebagai replica
 docker start postgres-primary
-
-# 5. Now you have TWO primaries (split-brain scenario)
-# Old primary thinks it's still primary
-# New primary (replica1) is accepting writes
-
-# Check both:
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "SELECT pg_is_in_recovery();"  # old primary
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -c "SELECT pg_is_in_recovery();"  # new primary
-
-# Both return 'false' = PROBLEM!
 ```
 
-**Solution**: STONITH (Shoot The Other Node In The Head)
-- Ensure old primary is truly dead before promotion
-- Use fencing mechanisms (network isolation, power off)
-- Automatic failover tools (Patroni, repmgr) handle this
+**Verification:**
+
+```sql
+-- Check 1: Verify Role Reversal
+-- postgres-replica1 sekarang PRIMARY
+psql -h postgres-replica1 -d postgres -c "SELECT pg_is_in_recovery();"
+-- Should return: f (false = PRIMARY)
+
+-- postgres-primary sekarang REPLICA
+psql -h postgres-primary -d postgres -c "SELECT pg_is_in_recovery();"
+-- Should return: t (true = REPLICA)
+
+-- Check 2: Replication Status
+-- Di postgres-replica1 (new primary):
+SELECT application_name, state, sync_state FROM pg_stat_replication;
+-- Should show 'walreceiver' (postgres-primary) streaming
+
+-- Check 3: Write Direction
+-- Write HANYA berhasil di postgres-replica1
+INSERT INTO users (name, email) VALUES ('Test', 'test@example.com');
+-- Success on postgres-replica1 ✅
+-- FAIL on postgres-primary (read-only) ❌
+
+-- Check 4: Replication Works
+-- Write di postgres-replica1, read di postgres-primary
+-- Data harus muncul (replicated)
+```
+
+**Timeline setelah re-join:**
+
+```
+Before Failover:
+  postgres-primary (P) → postgres-replica1 (R)
+                      → postgres-replica2 (R)
+
+After Failover + Re-join:
+  postgres-replica1 (P) → postgres-primary (R)   ← Old primary, now replica!
+                       → postgres-replica2 (R)
+
+Note: (P) = PRIMARY, (R) = REPLICA
+      Container names sama, ROLES berubah!
+```
+
+> **Praktik:** Lihat [QUICKSTART.md - Demo 4b](QUICKSTART.md#demo-4b-re-join-old-primary-as-replica) untuk step-by-step commands
 
 ---
 
-### Demo 7: Connection Pooling with PgBouncer
+## Demo Notes
 
-**Scenario**: Efficient connection management.
+### Simplifying Failover Demo
+
+Untuk mempermudah demonstrasi failover dan re-join, **disarankan stop postgres-replica2** sebelum Demo 4:
 
 ```bash
-# Connect via PgBouncer
-PGPASSWORD=postgres psql -h localhost -p 6432 -U postgres -d demodb -c \
-  "SELECT * FROM users LIMIT 5;"
-
-# Show PgBouncer stats
-PGPASSWORD=postgres psql -h localhost -p 6432 -U postgres -p postgres pgbouncer -c \
-  "SHOW POOLS;"
-
-PGPASSWORD=postgres psql -h localhost -p 6432 -U postgres -p postgres pgbouncer -c \
-  "SHOW STATS;"
+docker stop postgres-replica2
+# atau: podman stop postgres-replica2
 ```
 
-**Benefits**:
-- Reduce connection overhead
-- Connection reuse
-- Limit max connections to database
+**Alasan:**
+1. Fokus demo ke failover primary → replica1 saja
+2. Menghindari error logs dari replica2 yang mencari replication slot tidak ada
+3. Simplify topology: hanya 2 nodes (primary ↔ replica1)
+4. Lebih mudah memahami role reversal
+
+**Setelah failover:**
+- postgres-replica2 akan error karena mencari slot di postgres-primary (sudah offline)
+- postgres-replica2 tidak otomatis switch ke postgres-replica1 (manual reconfiguration needed)
+- Untuk production, gunakan automatic failover tools (Patroni, repmgr)
+
+**Jika ingin rejoin postgres-replica2:**
+Sama seperti postgres-primary, perlu rebuild:
+```bash
+rm -rf data/replica2/*
+podman run --rm --network demo-2-stateful-ha_postgres-net \
+  -v $(pwd)/data/replica2:/var/lib/postgresql/data \
+  -e PGPASSWORD=replicator123 \
+  postgres:17-alpine \
+  pg_basebackup -h postgres-replica1 -D /var/lib/postgresql/data \
+  -U replicator -v -P -W -R -X stream
+podman start postgres-replica2
+```
+
+---
+
+## PostgreSQL Client Access
+
+Demo ini menggunakan containerized PostgreSQL client (`psql-client`) sehingga tidak perlu instalasi lokal.
+
+**Konsep:**
+- Container `psql-client` menyediakan `psql`, `pg_basebackup`, dan tools PostgreSQL lainnya
+- Environment variables pre-configured (`PGPASSWORD`, `PGUSER`)
+- Working directory di-mount ke `/workspace` untuk akses scripts
+- Queries & monitoring commands dijalankan dari psql-client
+- Container management (stop/start/logs) dijalankan dari HOST
+
+**Implementation:**
+```yaml
+# docker-compose.yml
+psql-client:
+  image: postgres:17-alpine
+  command: sleep infinity
+  environment:
+    PGPASSWORD: postgres
+    PGUSER: postgres
+  volumes:
+    - .:/workspace
+```
+
+**Usage Pattern:**
+```bash
+# Akses psql-client
+docker exec -it psql-client sh
+
+# Di dalam psql-client, connect ke database
+psql -h postgres-primary -d demodb -c "SELECT COUNT(*) FROM users;"
+```
+
+> **Praktik:** Lihat [QUICKSTART.md](QUICKSTART.md) untuk step-by-step setup dan demo instructions
 
 ---
 
@@ -369,11 +431,11 @@ docker exec postgres-replica1 pg_isready -h postgres-primary -U replicator
 ### Replication lag too high
 
 ```bash
-# Check WAL generation rate (primary)
-docker exec postgres-primary psql -U postgres -c \
+# Check WAL generation rate (di dalam psql-client)
+psql -h postgres-primary -d postgres -c \
   "SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')) AS total_wal_generated;"
 
-# Check disk I/O on replica
+# Check disk I/O on replica (dari HOST)
 docker stats postgres-replica1
 
 # Increase replica resources or reduce primary load
@@ -395,13 +457,58 @@ docker start postgres-replica1
 ### Promote failed
 
 ```bash
-# Check if replica is caught up
-docker exec postgres-replica1 psql -U postgres -c \
+# Check if replica is caught up (di dalam psql-client)
+psql -h postgres-replica1 -d postgres -c \
   "SELECT pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() AS caught_up;"
 
-# Force promote
+# Force promote (dari HOST)
 docker exec postgres-replica1 pg_ctl promote -D /var/lib/postgresql/data
 ```
+
+### Container IP Changes (Docker/Podman DHCP Behavior)
+
+When containers restart, they may receive new IP addresses from the container network's DHCP. **PostgreSQL streaming replication handles this gracefully**:
+
+**How it works**:
+- Replica uses `primary_conninfo = 'host=postgres-primary ...'` (hostname, not IP)
+- PostgreSQL automatically performs DNS resolution on each connection attempt
+- Built-in retry mechanism reconnects after primary IP changes
+- WAL streaming resumes automatically after reconnection
+
+**Expected behavior after primary restart**:
+1. Primary stops → Replica detects disconnection
+2. Primary starts with new IP → Replica tries to reconnect
+3. DNS resolves new IP → Connection established
+4. Replication resumes (may take 10-30 seconds)
+
+**Verify recovery**:
+```bash
+# 1. Restart primary (gets new IP) - dari HOST
+docker restart postgres-primary
+
+# 2. Watch replica reconnect - di dalam psql-client
+watch -n2 'psql -h postgres-primary -d postgres -c "SELECT application_name, state, client_addr FROM pg_stat_replication;"'
+
+# 3. Check replica lag - di dalam psql-client
+psql -h postgres-replica1 -d postgres -c \
+  "SELECT now() - pg_last_xact_replay_timestamp() AS lag;"
+```
+
+**If replica doesn't reconnect**:
+```bash
+# Check primary_conninfo uses hostname (not IP) - dari HOST
+docker exec postgres-replica1 cat /var/lib/postgresql/data/postgresql.auto.conf | grep primary_conninfo
+
+# Should show: host=postgres-primary (NOT host=172.x.x.x)
+
+# Check DNS resolution works - dari HOST
+docker exec postgres-replica1 getent hosts postgres-primary
+
+# Check PostgreSQL logs for connection errors - dari HOST
+docker logs postgres-replica1 | grep -i "could not connect"
+```
+
+**Key difference from HAProxy**: PostgreSQL's libpq library performs DNS lookup on each connection attempt, making it resilient to IP changes without additional configuration.
 
 ---
 
@@ -446,11 +553,17 @@ FROM pg_replication_slots WHERE not active;  -- 10GB
 Replication ≠ Backup!
 
 ```bash
-# Regular backups still required
-pg_basebackup -h localhost -p 5432 -U postgres -D /backup/$(date +%Y%m%d)
+# Di dalam psql-client terminal:
+
+# Physical backup using pg_basebackup
+mkdir -p /workspace/backup
+pg_basebackup -h postgres-primary -U postgres -D /workspace/backup/$(date +%Y%m%d)
 
 # Or use pg_dump for logical backup
-PGPASSWORD=postgres pg_dump -h localhost -p 5432 -U postgres demodb > backup.sql
+pg_dump -h postgres-primary -d demodb > /workspace/backup.sql
+
+# Restore from backup
+psql -h postgres-primary -d demodb < /workspace/backup.sql
 ```
 
 ### Automatic Failover
@@ -470,53 +583,12 @@ Example Patroni setup in future demo (optional).
 # Stop all containers
 docker compose down
 
-# Remove volumes (WARNING: deletes all data)
-docker compose down -v
-rm -rf primary-data replica1-data replica2-data
+# Remove all data (WARNING: deletes all PostgreSQL data)
+rm -rf data/
 
 # Or keep data for next run
 docker compose down
 ```
-
----
-
-## Workshop Exercises
-
-### Exercise 1: Configure Synchronous Replication
-
-Modify primary to use synchronous replication:
-1. Edit `docker-compose.yml` - add `-c synchronous_commit=on`
-2. Add `-c synchronous_standby_names='postgres-replica1'`
-3. Restart and test write latency difference
-
-### Exercise 2: Cascade Replication
-
-Make replica2 replicate from replica1 (not primary):
-1. Modify `setup-replica.sh` for replica2
-2. Change `primary_conninfo` to point to replica1
-3. Test 3-tier replication
-
-### Exercise 3: Delayed Replica
-
-Create delayed replica for protection against human errors:
-1. Add new replica service
-2. Set `recovery_min_apply_delay = '1h'`
-3. Test data recovery from delayed replica
-
-### Exercise 4: Custom Failover Script
-
-Write script to:
-1. Detect primary failure
-2. Automatically promote best replica (least lag)
-3. Reconfigure other replicas
-4. Update load balancer
-
-### Exercise 5: Monitoring Dashboard
-
-Create monitoring dashboard:
-1. Collect metrics from `pg_stat_replication`
-2. Graph replication lag over time
-3. Alert on anomalies
 
 ---
 

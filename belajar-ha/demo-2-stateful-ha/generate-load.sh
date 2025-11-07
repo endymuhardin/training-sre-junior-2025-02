@@ -30,7 +30,7 @@ while true; do
     email="load_$elapsed@example.com"
 
     # Try to insert data
-    result=$(PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d demodb \
+    result=$(psql -h postgres-primary -d demodb \
         -c "INSERT INTO users (name, email) VALUES ('$name', '$email') RETURNING id;" \
         -t -A 2>&1)
 
@@ -57,4 +57,4 @@ echo "=========================================="
 # Show final count
 echo ""
 echo "Final user count:"
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d demodb -c "SELECT COUNT(*) as total_users FROM users;"
+psql -h postgres-primary -d demodb -c "SELECT COUNT(*) as total_users FROM users;"
