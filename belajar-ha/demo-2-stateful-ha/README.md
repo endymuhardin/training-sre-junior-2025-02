@@ -11,19 +11,15 @@ graph TB
     Client[Client/Application<br/>psql, Direct Connection]
 
     Primary[PostgreSQL Primary<br/>Read/Write<br/>:5432]
-    Replica1[PostgreSQL Replica 1<br/>Read Only<br/>:5433]
-    Replica2[PostgreSQL Replica 2<br/>Read Only<br/>:5434]
+    Replica1[PostgreSQL Replica<br/>Read Only<br/>:5433]
 
     Client -->|Write| Primary
     Client -->|Read| Replica1
-    Client -->|Read| Replica2
 
     Primary -->|Streaming<br/>Replication<br/>WAL Streaming| Replica1
-    Primary -->|Streaming<br/>Replication<br/>WAL Streaming| Replica2
 
     style Primary fill:#f96,stroke:#333,stroke-width:3px,color:#000
     style Replica1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
-    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ## Konsep HA yang Didemonstrasikan
