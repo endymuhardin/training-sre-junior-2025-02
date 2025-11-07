@@ -1,0 +1,295 @@
+services:
+  # ============================================
+  # DATABASE LAYER - PostgreSQL HA with pg_auto_failover
+  # ============================================
+
+  pg-monitor:
+    image: pg_auto_failover:pg17
+    platform: linux/amd64
+    container_name: pg-monitor
+    hostname: pg-monitor
+    environment:
+      PGDATA: /var/lib/postgres/data
+      PG_AUTOCTL_MONITOR: "true"
+    ports:
+      - "5430:5432"
+    volumes:
+      - pg-monitor-data:/var/lib/postgres
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.19
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoctl_node -d pg_auto_failover || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    command: >
+      sh -c "
+      if [ ! -f /var/lib/postgres/data/postgresql.conf ]; then
+        pg_autoctl create monitor --pgdata /var/lib/postgres/data --auth trust --ssl-self-signed --run;
+      else
+        pg_autoctl run --pgdata /var/lib/postgres/data;
+      fi
+      "
+
+  postgres-primary:
+    image: pg_auto_failover:pg17
+    platform: linux/amd64
+    container_name: postgres-primary
+    hostname: postgres-primary
+    environment:
+      PGDATA: /var/lib/postgres/data
+      PG_AUTOCTL_NODE_NAME: postgres-primary
+      PGUSER: app_user
+      PGDATABASE: demodb
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-primary-data:/var/lib/postgres
+      - ./db/pg_hba.conf:/tmp/pg_hba_custom.conf:ro
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.20
+    depends_on:
+      pg-monitor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+    command: >
+      sh -c "
+      if [ ! -f /var/lib/postgres/data/postgresql.conf ]; then
+        pg_autoctl create postgres --pgdata /var/lib/postgres/data --auth trust --ssl-self-signed --monitor 'postgres://autoctl_node@pg-monitor:5432/pg_auto_failover?sslmode=prefer' --hostname postgres-primary --name postgres-primary &&
+        cp /tmp/pg_hba_custom.conf /var/lib/postgres/data/pg_hba.conf &&
+        pg_autoctl run --pgdata /var/lib/postgres/data
+      else
+        cp /tmp/pg_hba_custom.conf /var/lib/postgres/data/pg_hba.conf &&
+        pg_autoctl run --pgdata /var/lib/postgres/data
+      fi
+      "
+
+  postgres-replica1:
+    image: pg_auto_failover:pg17
+    platform: linux/amd64
+    container_name: postgres-replica1
+    hostname: postgres-replica1
+    environment:
+      PGDATA: /var/lib/postgres/data
+      PG_AUTOCTL_NODE_NAME: postgres-replica1
+      PGUSER: app_user
+      PGDATABASE: demodb
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-replica1-data:/var/lib/postgres
+      - ./db/pg_hba.conf:/tmp/pg_hba_custom.conf:ro
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.21
+    depends_on:
+      pg-monitor:
+        condition: service_healthy
+      postgres-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+    command: >
+      sh -c "
+      sleep 10 &&
+      if [ ! -f /var/lib/postgres/data/postgresql.conf ]; then
+        pg_autoctl create postgres --pgdata /var/lib/postgres/data --auth trust --ssl-self-signed --monitor 'postgres://autoctl_node@pg-monitor:5432/pg_auto_failover?sslmode=prefer' --hostname postgres-replica1 --name postgres-replica1 &&
+        cp /tmp/pg_hba_custom.conf /var/lib/postgres/data/pg_hba.conf &&
+        pg_autoctl run --pgdata /var/lib/postgres/data
+      else
+        cp /tmp/pg_hba_custom.conf /var/lib/postgres/data/pg_hba.conf &&
+        pg_autoctl run --pgdata /var/lib/postgres/data
+      fi
+      "
+
+  # PostgreSQL Client - Interactive terminal with psql and pg_autoctl commands
+  psql-client:
+    image: pg_auto_failover:pg17
+    platform: linux/amd64
+    container_name: psql-client
+    environment:
+      PGPASSWORD: postgres
+      PGUSER: postgres
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.22
+    depends_on:
+      pg-monitor:
+        condition: service_healthy
+      postgres-primary:
+        condition: service_healthy
+    command: sleep infinity
+
+  # ============================================
+  # DATABASE MIGRATION - Init Container
+  # ============================================
+
+  db-migrate:
+    image: flyway/flyway:11-alpine
+    container_name: db-migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres-primary:5432/demodb
+      FLYWAY_USER: docker
+      FLYWAY_PASSWORD: ""
+      FLYWAY_BASELINE_ON_MIGRATE: "true"
+      FLYWAY_CONNECT_RETRIES: 60
+    volumes:
+      - ./db/migrations:/flyway/sql:ro
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.25
+    depends_on:
+      pg-monitor:
+        condition: service_healthy
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica1:
+        condition: service_started
+    command: migrate
+    restart: "no"
+
+  # ============================================
+  # APPLICATION LAYER - Flask Apps
+  # ============================================
+
+  app1:
+    build: ./app
+    container_name: app1
+    hostname: app1
+    environment:
+      DB_WRITE_HOST: haproxy1
+      DB_WRITE_PORT: 6432
+      DB_READ_HOST: haproxy1
+      DB_READ_PORT: 6433
+      DB_NAME: demodb
+      DB_USER: app_user
+      DB_PASSWORD: app_password
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.30
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  app2:
+    build: ./app
+    container_name: app2
+    hostname: app2
+    environment:
+      DB_WRITE_HOST: haproxy1
+      DB_WRITE_PORT: 6432
+      DB_READ_HOST: haproxy1
+      DB_READ_PORT: 6433
+      DB_NAME: demodb
+      DB_USER: app_user
+      DB_PASSWORD: app_password
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.31
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # ============================================
+  # LOAD BALANCER LAYER - HAProxy HA
+  # ============================================
+
+  haproxy1:
+    image: haproxy:2.9-alpine
+    container_name: haproxy1
+    hostname: haproxy1
+    user: root
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./haproxy/keepalived-master.conf:/etc/keepalived/keepalived.conf:ro
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.10
+    command: >
+      sh -c "apk add --no-cache keepalived &&
+             keepalived -f /etc/keepalived/keepalived.conf -D -l &&
+             haproxy -f /usr/local/etc/haproxy/haproxy.cfg"
+
+  haproxy2:
+    image: haproxy:2.9-alpine
+    container_name: haproxy2
+    hostname: haproxy2
+    user: root
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./haproxy/keepalived-backup.conf:/etc/keepalived/keepalived.conf:ro
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.11
+    command: >
+      sh -c "apk add --no-cache keepalived &&
+             keepalived -f /etc/keepalived/keepalived.conf -D -l &&
+             haproxy -f /usr/local/etc/haproxy/haproxy.cfg"
+
+  # ============================================
+  # VIP ACCESS PROXY - For external access
+  # ============================================
+
+  vip-access:
+    image: nginx:alpine
+    container_name: vip-access
+    ports:
+      - "8080:80"       # HTTP traffic
+      - "8404:8404"     # HAProxy stats
+      - "6432:6432"     # PostgreSQL write (via HAProxy)
+      - "6433:6433"     # PostgreSQL read (via HAProxy)
+    networks:
+      fullstack-net:
+        ipv4_address: 172.30.0.5
+    volumes:
+      - ./nginx/nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - haproxy1
+      - haproxy2
+
+networks:
+  fullstack-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+volumes:
+  pg-monitor-data:
+  pg-primary-data:
+  pg-replica1-data:
