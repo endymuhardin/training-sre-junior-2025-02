@@ -72,15 +72,15 @@ graph TB
 
     Primary -->|Streaming<br/>Replication<br/>Quorum Sync| Replica
 
-    style VIP fill:#ff6,stroke:#333,stroke-width:3px
-    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
-    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style App1 fill:#9f9,stroke:#333,stroke-width:2px
-    style App2 fill:#9f9,stroke:#333,stroke-width:2px
-    style Monitor fill:#fcf,stroke:#333,stroke-width:3px
-    style Primary fill:#f96,stroke:#333,stroke-width:3px
-    style Replica fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx fill:#ccc,stroke:#333,stroke-width:2px
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px,color:#000
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5,color:#000
+    style App1 fill:#9f9,stroke:#333,stroke-width:2px,color:#000
+    style App2 fill:#9f9,stroke:#333,stroke-width:2px,color:#000
+    style Monitor fill:#fcf,stroke:#333,stroke-width:3px,color:#000
+    style Primary fill:#f96,stroke:#333,stroke-width:3px,color:#000
+    style Replica fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx fill:#ccc,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ## Konsep HA yang Didemonstrasikan

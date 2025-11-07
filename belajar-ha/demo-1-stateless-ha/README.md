@@ -21,10 +21,10 @@ graph TB
     HAProxy --> Nginx2
     HAProxy --> Nginx3
 
-    style HAProxy fill:#f96,stroke:#333,stroke-width:2px
-    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
+    style HAProxy fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ### Part 2: Full Stack HA (docker-compose-2.yml)
@@ -51,12 +51,12 @@ graph TB
     HAProxy2 -.-> Nginx2
     HAProxy2 -.-> Nginx3
 
-    style VIP fill:#ff6,stroke:#333,stroke-width:3px
-    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
-    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px,color:#000
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5,color:#000
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ## Konsep HA yang Didemonstrasikan

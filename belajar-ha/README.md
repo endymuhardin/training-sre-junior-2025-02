@@ -52,10 +52,10 @@ graph TB
     HAProxy --> Nginx2
     HAProxy --> Nginx3
 
-    style HAProxy fill:#f96,stroke:#333,stroke-width:2px
-    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
+    style HAProxy fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 **Part 2: HA HAProxy with Keepalived**
@@ -84,12 +84,12 @@ graph TB
     HAProxy2 -.-> Nginx2
     HAProxy2 -.-> Nginx3
 
-    style VIP fill:#ff6,stroke:#333,stroke-width:3px
-    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
-    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px,color:#000
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5,color:#000
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 [📖 Dokumentasi Lengkap](demo-1-stateless-ha/README.md)
@@ -138,9 +138,9 @@ graph TB
     Primary -->|Streaming<br/>Replication| Replica1
     Primary -->|Streaming<br/>Replication| Replica2
 
-    style Primary fill:#f96,stroke:#333,stroke-width:3px
-    style Replica1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Primary fill:#f96,stroke:#333,stroke-width:3px,color:#000
+    style Replica1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 **Fitur Utama**:
@@ -218,15 +218,15 @@ graph TB
 
     Primary -->|Streaming<br/>Replication<br/>Quorum Sync| Replica
 
-    style VIP fill:#ff6,stroke:#333,stroke-width:3px
-    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
-    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style App1 fill:#9f9,stroke:#333,stroke-width:2px
-    style App2 fill:#9f9,stroke:#333,stroke-width:2px
-    style Monitor fill:#fcf,stroke:#333,stroke-width:3px
-    style Primary fill:#f96,stroke:#333,stroke-width:3px
-    style Replica fill:#9cf,stroke:#333,stroke-width:2px
-    style Nginx fill:#ccc,stroke:#333,stroke-width:2px
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px,color:#000
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px,color:#000
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5,color:#000
+    style App1 fill:#9f9,stroke:#333,stroke-width:2px,color:#000
+    style App2 fill:#9f9,stroke:#333,stroke-width:2px,color:#000
+    style Monitor fill:#fcf,stroke:#333,stroke-width:3px,color:#000
+    style Primary fill:#f96,stroke:#333,stroke-width:3px,color:#000
+    style Replica fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Nginx fill:#ccc,stroke:#333,stroke-width:2px,color:#000
 ```
 
 **Fitur Utama**:
@@ -332,9 +332,9 @@ graph LR
     Demo1 -->|Add Database| Demo2
     Demo2 -->|Add Automation| Demo3
 
-    style Demo1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Demo2 fill:#9cf,stroke:#333,stroke-width:2px
-    style Demo3 fill:#f96,stroke:#333,stroke-width:3px
+    style Demo1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Demo2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Demo3 fill:#f96,stroke:#333,stroke-width:3px,color:#000
 ```
 
 **Demo 1** fokus pada redundansi load balancer dan scaling aplikasi.

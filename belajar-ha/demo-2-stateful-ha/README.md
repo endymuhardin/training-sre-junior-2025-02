@@ -21,9 +21,9 @@ graph TB
     Primary -->|Streaming<br/>Replication<br/>WAL Streaming| Replica1
     Primary -->|Streaming<br/>Replication<br/>WAL Streaming| Replica2
 
-    style Primary fill:#f96,stroke:#333,stroke-width:3px
-    style Replica1 fill:#9cf,stroke:#333,stroke-width:2px
-    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Primary fill:#f96,stroke:#333,stroke-width:3px,color:#000
+    style Replica1 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
+    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ## Konsep HA yang Didemonstrasikan
