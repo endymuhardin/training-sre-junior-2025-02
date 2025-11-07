@@ -4,10 +4,11 @@ Demonstrasi hands-on untuk memahami konsep, prinsip, dan teknik High Availabilit
 
 ## Overview
 
-Workshop ini mencakup 2 demo utama yang mendemonstrasikan HA di berbagai layer aplikasi:
+Workshop ini mencakup 3 demo komprehensif yang mendemonstrasikan HA di berbagai layer aplikasi:
 
 1. **Demo 1**: Stateless Layer HA (HAProxy + Nginx)
 2. **Demo 2**: Stateful Layer HA (PostgreSQL Replication)
+3. **Demo 3**: Full Stack HA End-to-End (Complete integration)
 
 ## Workshop Structure
 
@@ -67,6 +68,48 @@ Workshop ini mencakup 2 demo utama yang mendemonstrasikan HA di berbagai layer a
 
 ---
 
+### Demo 3: Full Stack High Availability (End-to-End)
+📁 `demo-3-full-stack-ha/`
+
+**Konsep yang dipelajari**:
+- Complete multi-tier HA architecture
+- Load balancer redundancy (HAProxy + Keepalived)
+- Application layer redundancy with health checks
+- Database replication with read/write splitting
+- End-to-end failover scenarios
+- Cascade failure handling
+- Production-ready patterns
+
+**Technology Stack**:
+- HAProxy 2.9 (HA pair with Keepalived)
+- Python Flask (Custom REST API)
+- PostgreSQL 16 (Primary + Replica)
+- Docker Compose
+
+**Duration**: 120-150 minutes
+
+**Key Features**:
+1. Virtual IP failover for load balancers
+2. Automatic application instance detection
+3. Database connection management with fallback
+4. Read/write splitting (writes to primary, reads from replica)
+5. Comprehensive health checks at every layer
+6. Interactive web interface with real-time stats
+7. Automated chaos testing scenarios
+
+**Demo Scenarios**:
+1. Normal operation - load distribution
+2. Application instance failure
+3. Load balancer failover (VIP migration)
+4. Database replica failure (automatic fallback)
+5. Database primary failure (manual promotion)
+6. Cascade failures (multi-layer)
+7. Complete recovery procedures
+
+[📖 Full Documentation](demo-3-full-stack-ha/README.md)
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -100,6 +143,13 @@ open http://localhost:8404  # HAProxy stats
 cd ../demo-2-stateful-ha
 docker compose up -d
 ./test-replication.sh
+
+# Demo 3: Full Stack HA
+cd ../demo-3-full-stack-ha
+docker compose up -d --build
+sleep 60  # Wait for initialization
+./test-fullstack.sh
+open http://localhost:8080
 ```
 
 ---
@@ -429,6 +479,36 @@ By the end of this workshop, participants should be able to:
 - [ ] Estimate HA costs and benefits
 - [ ] Write basic runbooks
 - [ ] Plan disaster recovery
+
+---
+
+## Catatan Penting Container Runtime
+
+### DHCP dan DNS Considerations
+
+Ketika menggunakan Docker Desktop atau Podman Desktop, container yang di-restart akan mendapatkan alamat IP baru dari DHCP. Ini dapat menyebabkan masalah dengan layanan yang melakukan cache DNS resolution.
+
+**Semua demo telah dikonfigurasi untuk menangani masalah ini**, namun penting untuk memahami:
+
+- **HAProxy**: Memerlukan konfigurasi `resolvers` untuk DNS dinamis
+- **PostgreSQL**: Menangani perubahan IP secara native (tidak perlu konfigurasi)
+- **Keepalived**: Memerlukan konfigurasi keamanan script yang tepat
+
+**📖 Dokumentasi Lengkap**: [CONTAINER-RUNTIME-NOTES-ID.md](./CONTAINER-RUNTIME-NOTES-ID.md)
+
+Dokumentasi ini mencakup:
+- ✅ Penjelasan lengkap masalah DHCP/DNS
+- ✅ Analisis per demo dan solusinya
+- ✅ Perbedaan Docker vs Podman
+- ✅ Konfigurasi keamanan Keepalived
+- ✅ Troubleshooting decision tree
+- ✅ Best practices untuk production
+
+**Baca dokumentasi ini jika**:
+- Mengalami masalah backend DOWN setelah container restart
+- Menggunakan Podman (perlu update IP DNS server)
+- Melihat error "SECURITY VIOLATION" di log keepalived
+- Ingin memahami bagaimana setiap komponen menangani perubahan IP
 
 ---
 
