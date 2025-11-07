@@ -62,10 +62,16 @@ Demonstrasi High Availability pada stateless layer menggunakan HAProxy dan Nginx
 
 ## Part 1: Application Layer HA
 
+> **Penting**: Jika menggunakan Podman bukan Docker, konfigurasi HAProxy memerlukan pengaturan DNS yang berbeda. Lihat [Quirks Container Runtime](#container-runtime-quirks) di bagian Troubleshooting sebelum memulai.
+
 ### 1. Jalankan Environment
 
 ```bash
+# For Docker
 docker compose -f docker-compose-1.yml up -d
+
+# For Podman
+podman compose -f docker-compose-1.yml up -d
 ```
 
 ### 2. Verifikasi Services
@@ -342,6 +348,111 @@ option httpchk GET /health
 
 ## Troubleshooting
 
+### Container Runtime Quirks
+
+#### Perubahan IP Address Dinamis (Perilaku DHCP)
+Ketika container di-stop dan di-restart melalui Docker Desktop atau Podman Desktop, mereka mendapat **IP address baru** dari DHCP network container. Hal ini menyebabkan masalah dengan HAProxy karena:
+
+- HAProxy meng-cache resolusi DNS saat startup
+- Health check gagal dengan error **L4TOUT** (Layer 4 timeout)
+- Backend tetap dalam status **DOWN/MAINT** meskipun container sehat
+
+**Gejala Masalah**:
+```bash
+# Container berjalan dan sehat
+podman ps --filter name=nginx1
+# nginx1   Up 2 minutes (healthy)
+
+# Tapi HAProxy menunjukkan DOWN
+curl http://localhost:8404/ | grep nginx1
+# Status: DOWN - L4TOUT in 2001ms
+```
+
+**Akar Masalah**: HAProxy mencoba koneksi ke IP address lama yang sudah tidak ada.
+
+**Solusi**: Konfigurasi HAProxy dengan dynamic DNS resolution menggunakan section `resolvers`. Lihat haproxy.cfg:7-17 dan parameter `resolvers docker` pada baris server (haproxy.cfg:49-51).
+
+#### Perbedaan DNS Server: Docker vs Podman
+
+Docker dan Podman menggunakan **DNS server internal yang berbeda**:
+
+| Runtime | Alamat DNS Server | Cara Verifikasi |
+|---------|-------------------|-----------------|
+| Docker  | `127.0.0.11:53`   | `docker exec haproxy cat /etc/resolv.conf` |
+| Podman  | `<network-gateway>:53` (contoh: `10.89.4.1:53`) | `podman exec haproxy cat /etc/resolv.conf` |
+
+**Penting**: Section `resolvers` di `haproxy.cfg` harus sesuai dengan container runtime yang digunakan:
+
+```haproxy
+# Untuk Docker
+resolvers docker
+    nameserver dns1 127.0.0.11:53
+
+# Untuk Podman
+resolvers docker
+    nameserver dns1 10.89.4.1:53  # Gunakan IP gateway network Anda
+```
+
+**Cara Mencari DNS Server Podman Anda**:
+```bash
+# Cek resolv.conf di container HAProxy
+podman exec haproxy cat /etc/resolv.conf
+# Output:
+# search dns.podman
+# nameserver 10.89.4.1    <-- Gunakan IP ini
+
+# Atau inspect network
+podman network inspect demo-1-stateless-ha_ha-net | grep gateway
+```
+
+**Gejala Konfigurasi DNS Salah**:
+- Semua backend masuk mode **MAINT** (maintenance)
+- Log HAProxy menunjukkan: `DNS timeout status`
+- Error: `backend 'nginx_backend' has no server available!`
+
+**Perbaikan**: Update IP nameserver di haproxy.cfg:8 dan restart HAProxy.
+
+#### Testing Dynamic DNS Resolution
+
+Setelah mengkonfigurasi section `resolvers` dengan benar, test bahwa backend otomatis ter-register kembali setelah restart:
+
+```bash
+# 1. Verifikasi semua backend UP
+curl -s http://localhost:8404/ | grep -E 'nginx[0-9]' | grep UP
+
+# 2. Catat IP saat ini dari nginx1
+podman exec haproxy getent hosts nginx1
+# Output: 10.89.4.3  nginx1.dns.podman
+
+# 3. Stop dan restart nginx1 (akan dapat IP baru)
+podman stop nginx1
+sleep 5
+podman start nginx1
+
+# 4. Tunggu 10-15 detik untuk DNS re-resolution
+sleep 15
+
+# 5. Verifikasi nginx1 kembali UP dengan IP baru
+curl -s http://localhost:8404/ | grep nginx1 | grep UP
+# Seharusnya menunjukkan: Status: UP dengan IP address baru
+
+# 6. Konfirmasi IP baru terdeteksi
+podman exec haproxy getent hosts nginx1
+# Output: 10.89.4.9  nginx1.dns.podman  (IP berbeda)
+```
+
+**Perilaku yang Diharapkan**:
+- Backend menjadi DOWN ketika container stop
+- Backend otomatis kembali UP dalam 10-15 detik setelah restart
+- Tidak perlu restart HAProxy manual
+- Halaman stats HAProxy menunjukkan IP address yang sudah di-update
+
+**Jika backend tidak auto-recover**:
+1. Cek konfigurasi `resolvers` memiliki DNS server yang benar
+2. Verifikasi `timeout check` cukup (10000ms direkomendasikan)
+3. Pastikan baris server memiliki `resolvers docker init-addr libc,none`
+4. Cek log HAProxy untuk error terkait DNS
+
 ### VIP tidak muncul
 ```bash
 # Check keepalived running
@@ -392,9 +503,11 @@ curl http://localhost:8404
 
 ### HAProxy Best Practices
 - Use `option redispatch` untuk retry pada server lain
-- Set appropriate `timeout` values
+- Set appropriate `timeout` values (especially `timeout check` for health checks)
 - Enable `option http-server-close` untuk connection pooling
 - Use `maxconn` untuk rate limiting
+- **Configure DNS resolvers** untuk dynamic backend IP resolution (critical for container environments)
+- Use `init-addr libc,none` pada server definitions untuk graceful DNS failures
 
 ### Keepalived Best Practices
 - Use unique `virtual_router_id` per VRRP instance
