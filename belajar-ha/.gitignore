@@ -1,7 +1,6 @@
 # PostgreSQL data directories
-demo-2-stateful-ha/primary-data/
-demo-2-stateful-ha/replica1-data/
-demo-2-stateful-ha/replica2-data/
+demo-2-stateful-ha/data/
+demo-3-full-stack-ha/data/
 
 # Logs
 *.log

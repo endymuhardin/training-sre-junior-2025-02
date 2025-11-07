@@ -7,47 +7,56 @@ Demonstrasi High Availability pada stateless layer menggunakan HAProxy dan Nginx
 ## Arsitektur
 
 ### Part 1: Application Layer HA (docker-compose-1.yml)
-```
-     ┌─────────────────────┐
-     │   HAProxy (Single)  │
-     │   Port 8080         │
-     └──────────┬──────────┘
-                │
-        ┌───────┼───────┐
-        │       │       │
-     ┌──▼──┐ ┌──▼──┐ ┌──▼──┐
-     │Nginx│ │Nginx│ │Nginx│
-     │  1  │ │  2  │ │  3  │
-     └─────┘ └─────┘ └─────┘
+
+```mermaid
+graph TB
+    Users[Users/Clients<br/>localhost:8080]
+    HAProxy[HAProxy<br/>Load Balancer<br/>:8080]
+    Nginx1[Nginx 1<br/>Web Server<br/>:80]
+    Nginx2[Nginx 2<br/>Web Server<br/>:80]
+    Nginx3[Nginx 3<br/>Web Server<br/>:80]
+
+    Users --> HAProxy
+    HAProxy -->|Health Check<br/>Round Robin| Nginx1
+    HAProxy --> Nginx2
+    HAProxy --> Nginx3
+
+    style HAProxy fill:#f96,stroke:#333,stroke-width:2px
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
 ```
 
 ### Part 2: Full Stack HA (docker-compose-2.yml)
-```
-     ┌──────────────────────────┐
-     │   vip-access (nginx)     │  ⚠️ DEMO ONLY - SPOF!
-     │   localhost:8080         │     (Tidak ada di production)
-     └──────────────┬───────────┘
-                    │
-     ┌──────────────▼───────────────┐
-     │    Virtual IP (172.20.0.100) │
-     │         Keepalived           │
-     └───────────────┬──────────────┘
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-     ┌────▼────┐          ┌────▼────┐
-     │HAProxy 1│          │HAProxy 2│
-     │ MASTER  │          │ BACKUP  │
-     └────┬────┘          └────┬────┘
-          │                     │
-          └──────────┬──────────┘
-                     │
-             ┌───────┼───────┐
-             │       │       │
-          ┌──▼──┐ ┌──▼──┐ ┌──▼──┐
-          │Nginx│ │Nginx│ │Nginx│
-          │  1  │ │  2  │ │  3  │
-          └─────┘ └─────┘ └─────┘
+
+```mermaid
+graph TB
+    Users[Users/Clients<br/>localhost:8080]
+    VIP[Virtual IP<br/>172.20.0.100<br/>Keepalived VRRP]
+    HAProxy1[HAProxy 1 Master<br/>Priority: 101<br/>:8080, :8404]
+    HAProxy2[HAProxy 2 Backup<br/>Priority: 100<br/>:8080, :8404]
+    Nginx1[Nginx 1<br/>Web Server<br/>:80]
+    Nginx2[Nginx 2<br/>Web Server<br/>:80]
+    Nginx3[Nginx 3<br/>Web Server<br/>:80]
+
+    Users --> VIP
+    VIP -.->|Active| HAProxy1
+    VIP -.->|Standby| HAProxy2
+
+    HAProxy1 -->|Health Check<br/>Round Robin| Nginx1
+    HAProxy1 --> Nginx2
+    HAProxy1 --> Nginx3
+
+    HAProxy2 -.->|Backup| Nginx1
+    HAProxy2 -.-> Nginx2
+    HAProxy2 -.-> Nginx3
+
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
 ```
 
 ## Konsep HA yang Didemonstrasikan

@@ -4,68 +4,83 @@ Demonstrasi end-to-end yang menggabungkan semua layer HA: Load Balancer, Applica
 
 > 📖 **Documentation:** Untuk copy-paste commands & demo praktis, lihat **[QUICKSTART.md](QUICKSTART.md)**
 
+## Prerequisites
+
+### Building Custom PostgreSQL 17 Image
+
+Demo ini menggunakan PostgreSQL 17 dengan pg_auto_failover. Karena official Docker images di Docker Hub hanya tersedia sampai PostgreSQL 15, kita perlu build custom image dari source repository.
+
+**Quick build:**
+```bash
+./scripts/build-pg-image.sh
+```
+
+**Manual build:**
+```bash
+cd /tmp
+git clone --depth 1 https://github.com/citusdata/pg_auto_failover.git
+cd pg_auto_failover
+podman build --platform linux/amd64 -t pg_auto_failover:pg17 -f Dockerfile .
+```
+
+Build process memakan waktu 5-10 menit karena compile PostgreSQL 17 from source.
+
+> **Note:** Script `build-pg-image.sh` akan melakukan clone repository dan build image secara otomatis. Image yang dihasilkan: `pg_auto_failover:pg17`
+
 ## Arsitektur
 
-```
-                     ┌─────────────┐
-                     │    Users    │
-                     └──────┬──────┘
-                            │ localhost:8080
-                ┌───────────▼───────────┐
-                │     vip-access        │
-                │   (nginx proxy)       │
-                │      172.30.0.5       │
-                └───────────┬───────────┘
-                            │
-                ┌───────────▼───────────┐
-                │  Virtual IP (VRRP)    │
-                │    172.30.0.100       │
-                │   (Keepalived HA)     │
-                └───────────┬───────────┘
-                            │
-             ┌──────────────┴──────────────┐
-             │                             │
-      ┌──────▼──────┐              ┌──────▼──────┐
-      │  HAProxy 1  │              │  HAProxy 2  │
-      │  (Master)   │              │  (Backup)   │
-      │  .10        │              │  .11        │
-      │             │              │             │
-      │ HTTP :80    │              │ HTTP :80    │
-      │ PG-W :6432  │              │ PG-W :6432  │
-      │ PG-R :6433  │              │ PG-R :6433  │
-      │ Stats:8404  │              │ Stats:8404  │
-      └──────┬──────┘              └──────┬──────┘
-             │                             │
-             │        Health Checks        │
-             └──────────┬──────────────────┘
-                        │
-          ┌─────────────┼─────────────┐
-          │             │             │
-    ┌─────▼─────┐  ┌────▼────┐  ┌─────▼─────┐
-    │   App 1   │  │   App 2 │  │pg-monitor │
-    │  (Flask)  │  │ (Flask) │  │  pg_auto  │
-    │   .30     │  │   .31   │  │  failover │
-    └─────┬─────┘  └─────┬───┘  │   .19     │
-          │              │      └─────┬─────┘
-          │              │            │
-          │ HAProxy      │            │ Monitors
-          │ :6432/:6433  │            │ health &
-          │              │            │ orchestrates
-          │              │            │ failover
-          └──────┬───────┘            │
-                 │                    │
-    ┌────────────┼────────────────────┼─────┐
-    │            │                    │     │
-    │     ┌──────▼──────┐      ┌──────▼────┐│
-    │     │ PostgreSQL  │      │PostgreSQL ││
-    │     │  Primary*   │◄─────┤ Replica*  ││
-    │     │   (R/W)     │stream│   (R/O)   ││
-    │     │   .20       │      │   .21     ││
-    │     └─────────────┘      └───────────┘│
-    │                                       │
-    │  * pg_auto_failover managed nodes     │
-    │    Automatic promotion & demotion     │
-    └───────────────────────────────────────┘
+```mermaid
+graph TB
+    Users[Users<br/>localhost:8080]
+
+    Nginx[Nginx Proxy<br/>vip-access<br/>:8080, :8404, :6432, :6433]
+
+    VIP[Virtual IP<br/>172.30.0.100<br/>Keepalived VRRP]
+
+    HAProxy1[HAProxy 1 Master<br/>:80 HTTP<br/>:6432 PG Write<br/>:6433 PG Read<br/>:8404 Stats]
+    HAProxy2[HAProxy 2 Backup<br/>:80 HTTP<br/>:6432 PG Write<br/>:6433 PG Read<br/>:8404 Stats]
+
+    App1[Flask App 1<br/>:5000]
+    App2[Flask App 2<br/>:5000]
+
+    Monitor[pg_auto_failover<br/>Monitor<br/>:5432]
+
+    Primary[PostgreSQL Primary<br/>Read/Write<br/>:5432]
+    Replica[PostgreSQL Replica<br/>Read Only<br/>:5432]
+
+    Users --> Nginx
+    Nginx --> VIP
+    VIP -.->|Active| HAProxy1
+    VIP -.->|Standby| HAProxy2
+
+    HAProxy1 -->|HTTP Load Balance| App1
+    HAProxy1 --> App2
+    HAProxy2 -.->|Backup| App1
+    HAProxy2 -.-> App2
+
+    App1 -->|Write :6432| HAProxy1
+    App1 -->|Read :6433| HAProxy1
+    App2 -->|Write :6432| HAProxy1
+    App2 -->|Read :6433| HAProxy1
+
+    HAProxy1 -->|PG Write| Primary
+    HAProxy1 -->|PG Read<br/>Load Balance| Primary
+    HAProxy1 -->|PG Read<br/>Load Balance| Replica
+
+    Monitor -->|Health Check<br/>State Machine| Primary
+    Monitor -->|Health Check<br/>State Machine| Replica
+
+    Primary -->|Streaming<br/>Replication<br/>Quorum Sync| Replica
+
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style App1 fill:#9f9,stroke:#333,stroke-width:2px
+    style App2 fill:#9f9,stroke:#333,stroke-width:2px
+    style Monitor fill:#fcf,stroke:#333,stroke-width:3px
+    style Primary fill:#f96,stroke:#333,stroke-width:3px
+    style Replica fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx fill:#ccc,stroke:#333,stroke-width:2px
 ```
 
 ## Konsep HA yang Didemonstrasikan
@@ -168,22 +183,31 @@ Application Impact: Brief connection resets
 ```
 demo-3-full-stack-ha/
 ├── docker-compose.yml           # Orchestration semua services
-├── haproxy.cfg                  # HAProxy config untuk HTTP & PostgreSQL
-├── keepalived-master.conf       # Keepalived config untuk haproxy1
-├── keepalived-backup.conf       # Keepalived config untuk haproxy2
-├── nginx-proxy.conf             # Nginx proxy untuk external access
-├── init-schema.sql              # Database schema initialization
+├── README.md                    # Dokumentasi lengkap
+├── QUICKSTART.md                # Quick start guide dengan demo scenarios
 ├── app/
 │   ├── Dockerfile
 │   ├── app.py                   # Flask application dengan DB routing
 │   └── requirements.txt
-├── check-cluster.sh             # Helper: check pg_auto_failover state
-├── test-auto-failover.sh        # Helper: test automatic failover
-├── manual-failover.sh           # Helper: trigger manual switchover
-└── data/                        # PostgreSQL data directories (gitignored)
-    ├── monitor/
-    ├── primary/
-    └── replica1/
+├── db/
+│   ├── pg_hba.conf              # PostgreSQL access control
+│   └── migrations/              # Flyway migrations
+│       ├── V1__grant_permissions.sql
+│       └── V2__create_schema.sql
+├── haproxy/
+│   ├── haproxy.cfg              # HAProxy config untuk HTTP & PostgreSQL
+│   ├── keepalived-master.conf   # Keepalived config untuk haproxy1
+│   └── keepalived-backup.conf   # Keepalived config untuk haproxy2
+├── nginx/
+│   └── nginx-proxy.conf         # Nginx proxy untuk external access
+└── scripts/
+    ├── build-pg-image.sh        # Build custom PostgreSQL 17 image
+    ├── check-cluster.sh         # Helper: check pg_auto_failover state
+    ├── test-auto-failover.sh    # Helper: test automatic failover
+    ├── manual-failover.sh       # Helper: trigger manual switchover
+    ├── chaos-test.sh            # Helper: chaos testing scenarios
+    ├── generate-load.sh         # Helper: generate traffic load
+    └── test-fullstack.sh        # Helper: test full stack
 ```
 
 ---
@@ -497,14 +521,37 @@ postgres-primary:
 
 ### Database Schema Initialization
 
-**File:** `init-schema.sql`
+**Automated Database Creation:**
 
+Demo ini menggunakan environment variables untuk automatic database creation:
+
+```yaml
+# docker-compose.yml
+postgres-primary:
+  environment:
+    PGUSER: app_user          # Membuat user ini secara otomatis
+    PGDATABASE: demodb        # Membuat database ini secara otomatis
+    POSTGRES_PASSWORD: postgres
+```
+
+**Flyway Migrations:**
+
+Schema initialization menggunakan Flyway untuk versioned migrations:
+
+**File:** `db/migrations/V1__grant_permissions.sql`
 ```sql
--- Create demo database
-CREATE DATABASE demodb;
+-- Grant permissions ke app_user (sudah dibuat oleh pg_auto_failover)
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_user;
+GRANT USAGE, CREATE ON SCHEMA public TO app_user;
 
-\c demodb
+-- Set default privileges untuk tabel yang akan dibuat
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO app_user;
+```
 
+**File:** `db/migrations/V2__create_schema.sql`
+```sql
 -- Create demo table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -513,14 +560,40 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert initial data
-INSERT INTO users (name, email) VALUES ...;
+-- Insert initial sample data
+INSERT INTO users (name, email) VALUES
+    ('Alice Admin', 'alice@example.com'),
+    ('Bob Builder', 'bob@example.com'),
+    ('Charlie Chef', 'charlie@example.com'),
+    ('Diana Developer', 'diana@example.com'),
+    ('Eve Engineer', 'eve@example.com');
+```
+
+**Init Container Configuration:** `docker-compose.yml:144-166`
+```yaml
+db-migrate:
+  image: flyway/flyway:11-alpine
+  environment:
+    FLYWAY_URL: jdbc:postgresql://postgres-primary:5432/demodb
+    FLYWAY_USER: docker
+    FLYWAY_PASSWORD: ""
+    FLYWAY_BASELINE_ON_MIGRATE: "true"
+    FLYWAY_CONNECT_RETRIES: 60
+  volumes:
+    - ./db/migrations:/flyway/sql:ro
+  depends_on:
+    postgres-primary:
+      condition: service_healthy
+  command: migrate
+  restart: "no"
 ```
 
 **Kapan executed:**
-- Hanya pada **first-time initialization** postgres-primary
-- pg_auto_failover menggunakan `/docker-entrypoint-initdb.d/` mechanism dari official PostgreSQL image
-- Replica tidak menjalankan script ini (data replicated dari primary)
+- Init container `db-migrate` runs setelah PostgreSQL cluster healthy
+- Flyway executes all migrations in order (V1, V2, ...)
+- Migrations tracked di `flyway_schema_history` table
+- Idempotent: safe to re-run, skips executed migrations
+- Replica tidak menjalankan migrations (data replicated dari primary)
 
 ---
 
@@ -933,29 +1006,55 @@ Scenarios yang tidak protected oleh replication:
 
 ### Connection Pooling
 
-**Masalah tanpa pooling:**
-- Overhead create/destroy connections
-- Limited max_connections di PostgreSQL (default 100)
-- Scaling issues dengan banyak application instances
+**Application-Level Pooling (Recommended First)**
 
-**Solusi: PgBouncer**
+Modern frameworks have built-in connection pooling:
+- **Python**: psycopg3 pool, SQLAlchemy
+- **Java**: HikariCP, Apache DBCP
+- **Node.js**: pg-pool, Sequelize
+- **Go**: database/sql (built-in)
+- **.NET**: Entity Framework
 
-Architecture dengan PgBouncer:
+**Demo 3 Implementation:**
+```python
+# psycopg3 supports connection pooling
+from psycopg_pool import ConnectionPool
+
+pool = ConnectionPool(
+    conninfo="host=haproxy1 port=6432 dbname=demodb",
+    min_size=2,
+    max_size=10
+)
 ```
-App instances (100+)
+
+**When Application Pooling Is Sufficient:**
+- Single monolithic application
+- Moderate concurrent connections (< 100)
+- Long-lived application processes
+- Connection reuse within same process
+
+**When PgBouncer Is Needed:**
+
+Use PgBouncer (server-side pooling) for:
+1. **Serverless/Lambda**: Short-lived functions creating many connections
+2. **Microservices**: Many small services, each with their own pool
+3. **Legacy apps**: No built-in pooling support
+4. **Transaction pooling**: More aggressive pooling than session pooling
+
+Architecture with PgBouncer:
+```
+Serverless Functions (1000+) or Microservices (100+)
     ↓
 HAProxy (connection routing)
     ↓
-PgBouncer (connection pooling, max 20 connections)
+PgBouncer (transaction pooling, max 20 connections)
     ↓
 PostgreSQL (max_connections = 100)
 ```
 
-**Benefits:**
-- Reduce connection overhead
-- Transaction pooling
-- Connection reuse across requests
-- Better resource utilization
+**Trade-offs:**
+- **Application pooling**: Simpler, sufficient for most cases
+- **PgBouncer**: Additional component, needed for specific architectures
 
 ---
 
@@ -991,12 +1090,13 @@ PostgreSQL (max_connections = 100)
 
 ## Langkah Selanjutnya
 
-- **Patroni:** Alternative using etcd/consul for distributed consensus
-- **PgBouncer:** Connection pooling untuk improve performance
+- **Patroni:** Alternative to pg_auto_failover using etcd/consul for distributed consensus
+- **Application Connection Pooling:** Implement psycopg3 ConnectionPool, SQLAlchemy pooling
+- **PgBouncer:** Server-side pooling for serverless/microservices architectures
 - **Logical Replication:** Multi-datacenter dengan selective replication
 - **pgBackRest:** Production-grade backup/restore solution
 - **Prometheus + Grafana:** Monitoring dan alerting
-- **Kubernetes + Operator:** Cloud-native PostgreSQL HA
+- **Kubernetes + Operator:** Cloud-native PostgreSQL HA (Zalando, CrunchyData, CloudNativePG)
 
 ---
 

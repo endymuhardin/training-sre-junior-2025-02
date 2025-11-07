@@ -1,18 +1,18 @@
-# High Availability Workshop Demos
+# Demo Workshop High Availability
 
 Demonstrasi hands-on untuk memahami konsep, prinsip, dan teknik High Availability dalam sistem production.
 
-## Overview
+## Gambaran Umum
 
 Workshop ini mencakup 3 demo komprehensif yang mendemonstrasikan HA di berbagai layer aplikasi:
 
 1. **Demo 1**: Stateless Layer HA (HAProxy + Nginx)
 2. **Demo 2**: Stateful Layer HA (PostgreSQL Replication)
-3. **Demo 3**: Full Stack HA End-to-End (Complete integration)
+3. **Demo 3**: Full Stack HA End-to-End (Integrasi lengkap)
 
-## Workshop Structure
+## Struktur Workshop
 
-### Demo 1: Stateless Layer High Availability
+### Demo 1: High Availability Layer Stateless
 📁 `demo-1-stateless-ha/`
 
 **Konsep yang dipelajari**:
@@ -28,43 +28,128 @@ Workshop ini mencakup 3 demo komprehensif yang mendemonstrasikan HA di berbagai 
 - Keepalived
 - Docker Compose
 
-**Duration**: 60-90 minutes
+**Durasi**: 60-90 menit
 
 **Progression**:
-1. **Part 1**: Single HAProxy → Multiple Nginx (app-level HA)
-2. **Part 2**: HA HAProxy pair (with Keepalived) → Multiple Nginx (full stateless stack HA)
+1. **Part 1**: Single HAProxy → Multiple Nginx (HA level aplikasi)
+2. **Part 2**: HA HAProxy pair (dengan Keepalived) → Multiple Nginx (HA stack stateless lengkap)
 
-[📖 Full Documentation](demo-1-stateless-ha/README.md)
+#### Arsitektur
+
+**Part 1: Single HAProxy**
+```mermaid
+graph TB
+    Users[Users/Clients<br/>localhost:8080]
+
+    HAProxy[HAProxy<br/>Load Balancer<br/>:8080]
+
+    Nginx1[Nginx 1<br/>Web Server<br/>:80]
+    Nginx2[Nginx 2<br/>Web Server<br/>:80]
+    Nginx3[Nginx 3<br/>Web Server<br/>:80]
+
+    Users --> HAProxy
+    HAProxy -->|Health Check<br/>Round Robin| Nginx1
+    HAProxy --> Nginx2
+    HAProxy --> Nginx3
+
+    style HAProxy fill:#f96,stroke:#333,stroke-width:2px
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
+```
+
+**Part 2: HA HAProxy with Keepalived**
+```mermaid
+graph TB
+    Users[Users/Clients<br/>localhost:8080]
+
+    VIP[Virtual IP<br/>172.20.0.100<br/>Keepalived VRRP]
+
+    HAProxy1[HAProxy 1 Master<br/>Priority: 101<br/>:8080, :8404]
+    HAProxy2[HAProxy 2 Backup<br/>Priority: 100<br/>:8080, :8404]
+
+    Nginx1[Nginx 1<br/>Web Server<br/>:80]
+    Nginx2[Nginx 2<br/>Web Server<br/>:80]
+    Nginx3[Nginx 3<br/>Web Server<br/>:80]
+
+    Users --> VIP
+    VIP -.->|Active| HAProxy1
+    VIP -.->|Standby| HAProxy2
+
+    HAProxy1 -->|Health Check<br/>Round Robin| Nginx1
+    HAProxy1 --> Nginx2
+    HAProxy1 --> Nginx3
+
+    HAProxy2 -.->|Backup| Nginx1
+    HAProxy2 -.-> Nginx2
+    HAProxy2 -.-> Nginx3
+
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style Nginx1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx3 fill:#9cf,stroke:#333,stroke-width:2px
+```
+
+[📖 Dokumentasi Lengkap](demo-1-stateless-ha/README.md)
 
 ---
 
-### Demo 2: Stateful Layer High Availability
+### Demo 2: High Availability Layer Stateful
 📁 `demo-2-stateful-ha/`
 
 **Konsep yang dipelajari**:
 - PostgreSQL streaming replication
-- Primary-replica architecture
-- Read scaling strategies
-- Replication lag monitoring
-- Manual failover procedures
-- Data durability vs performance trade-offs
-- Split-brain scenarios
+- Arsitektur primary-replica
+- Strategi read scaling
+- Monitoring replication lag
+- Prosedur manual failover
+- Trade-off data durability vs performance
+- Skenario split-brain
 
 **Technology Stack**:
 - PostgreSQL 16
-- PgBouncer (connection pooling)
 - Docker Compose
 
-**Duration**: 90-120 minutes
+**Durasi**: 90-120 menit
 
-**Key Demos**:
-1. Basic replication setup
-2. Read scaling with replicas
-3. Primary failure & manual failover
-4. Replication lag under load
-5. Split-brain prevention
+**Demo Utama**:
+1. Setup replication dasar
+2. Read scaling dengan replicas
+3. Failure primary & manual failover
+4. Replication lag di bawah beban
+5. Pencegahan split-brain
 
-[📖 Full Documentation](demo-2-stateful-ha/README.md)
+#### Arsitektur
+
+```mermaid
+graph TB
+    Client[Client/Application<br/>psql, Direct Connection]
+
+    Primary[PostgreSQL Primary<br/>Read/Write<br/>:5432]
+    Replica1[PostgreSQL Replica 1<br/>Read Only<br/>:5433]
+    Replica2[PostgreSQL Replica 2<br/>Read Only<br/>:5434]
+
+    Client -->|Write| Primary
+    Client -->|Read| Replica1
+    Client -->|Read| Replica2
+
+    Primary -->|Streaming<br/>Replication| Replica1
+    Primary -->|Streaming<br/>Replication| Replica2
+
+    style Primary fill:#f96,stroke:#333,stroke-width:3px
+    style Replica1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px
+```
+
+**Fitur Utama**:
+- **Asynchronous Replication**: Replica lag di belakang primary
+- **Manual Failover**: Membutuhkan perintah `pg_promote()`
+- **Read Scaling**: Distribusi query read ke replicas
+- **Direct Connection**: Akses psql client sederhana untuk pembelajaran
+
+[📖 Dokumentasi Lengkap](demo-2-stateful-ha/README.md)
 
 ---
 
@@ -72,56 +157,101 @@ Workshop ini mencakup 3 demo komprehensif yang mendemonstrasikan HA di berbagai 
 📁 `demo-3-full-stack-ha/`
 
 **Konsep yang dipelajari**:
-- Complete multi-tier HA architecture
-- Load balancer redundancy (HAProxy + Keepalived)
-- Application layer redundancy with health checks
-- Database replication with read/write splitting
-- End-to-end failover scenarios
-- Cascade failure handling
-- Production-ready patterns
+- Arsitektur HA multi-tier lengkap
+- Redundansi load balancer
+- Redundansi application layer
+- **Automatic database failover** dengan pg_auto_failover
+- Skenario failover end-to-end
 
 **Technology Stack**:
-- HAProxy 2.9 (HA pair with Keepalived)
-- Python Flask (Custom REST API)
-- PostgreSQL 16 (Primary + Replica)
+- HAProxy 2.9 (HA pair dengan Keepalived)
+- Python Flask (dengan Flyway migrations)
+- **PostgreSQL 17 dengan pg_auto_failover**
 - Docker Compose
 
-**Duration**: 120-150 minutes
+**Durasi**: 120-150 menit
 
-**Key Features**:
-1. Virtual IP failover for load balancers
-2. Automatic application instance detection
-3. Database connection management with fallback
-4. Read/write splitting (writes to primary, reads from replica)
-5. Comprehensive health checks at every layer
-6. Interactive web interface with real-time stats
-7. Automated chaos testing scenarios
+**Prasyarat**: Build custom PostgreSQL 17 image (5-10 menit)
 
-**Demo Scenarios**:
-1. Normal operation - load distribution
-2. Application instance failure
-3. Load balancer failover (VIP migration)
-4. Database replica failure (automatic fallback)
-5. Database primary failure (manual promotion)
-6. Cascade failures (multi-layer)
-7. Complete recovery procedures
+#### Arsitektur
 
-[📖 Full Documentation](demo-3-full-stack-ha/README.md)
+```mermaid
+graph TB
+    Users[Users<br/>localhost:8080]
+
+    Nginx[Nginx Proxy<br/>vip-access<br/>:8080, :8404, :6432, :6433]
+
+    VIP[Virtual IP<br/>172.30.0.100<br/>Keepalived VRRP]
+
+    HAProxy1[HAProxy 1 Master<br/>:80 HTTP<br/>:6432 PG Write<br/>:6433 PG Read<br/>:8404 Stats]
+    HAProxy2[HAProxy 2 Backup<br/>:80 HTTP<br/>:6432 PG Write<br/>:6433 PG Read<br/>:8404 Stats]
+
+    App1[Flask App 1<br/>:5000]
+    App2[Flask App 2<br/>:5000]
+
+    Monitor[pg_auto_failover<br/>Monitor<br/>:5432]
+
+    Primary[PostgreSQL Primary<br/>Read/Write<br/>:5432]
+    Replica[PostgreSQL Replica<br/>Read Only<br/>:5432]
+
+    Users --> Nginx
+    Nginx --> VIP
+    VIP -.->|Active| HAProxy1
+    VIP -.->|Standby| HAProxy2
+
+    HAProxy1 -->|HTTP Load Balance| App1
+    HAProxy1 --> App2
+    HAProxy2 -.->|Backup| App1
+    HAProxy2 -.-> App2
+
+    App1 -->|Write :6432| HAProxy1
+    App1 -->|Read :6433| HAProxy1
+    App2 -->|Write :6432| HAProxy1
+    App2 -->|Read :6433| HAProxy1
+
+    HAProxy1 -->|PG Write| Primary
+    HAProxy1 -->|PG Read<br/>Load Balance| Primary
+    HAProxy1 -->|PG Read<br/>Load Balance| Replica
+
+    Monitor -->|Health Check<br/>State Machine| Primary
+    Monitor -->|Health Check<br/>State Machine| Replica
+
+    Primary -->|Streaming<br/>Replication<br/>Quorum Sync| Replica
+
+    style VIP fill:#ff6,stroke:#333,stroke-width:3px
+    style HAProxy1 fill:#f96,stroke:#333,stroke-width:2px
+    style HAProxy2 fill:#fcc,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style App1 fill:#9f9,stroke:#333,stroke-width:2px
+    style App2 fill:#9f9,stroke:#333,stroke-width:2px
+    style Monitor fill:#fcf,stroke:#333,stroke-width:3px
+    style Primary fill:#f96,stroke:#333,stroke-width:3px
+    style Replica fill:#9cf,stroke:#333,stroke-width:2px
+    style Nginx fill:#ccc,stroke:#333,stroke-width:2px
+```
+
+**Fitur Utama**:
+- **Automatic Failover**: pg_auto_failover mendeteksi failure dan mempromosikan replica (~30s)
+- **Zero Config Failover**: Aplikasi failover secara transparan via routing HAProxy
+- **Read/Write Splitting**: HAProxy routing write ke primary, read ke kedua node
+- **Full Stack Redundancy**: Setiap layer memiliki redundansi (LB, App, DB)
+- **Automated Schema Management**: Migrasi Flyway berjalan saat startup
+
+[📖 Dokumentasi Lengkap](demo-3-full-stack-ha/README.md) | [🚀 Quick Start](demo-3-full-stack-ha/QUICKSTART.md)
 
 ---
 
 ## Quick Start
 
-### Prerequisites
+### Prasyarat
 
 ```bash
-# Required
+# Wajib
 - Docker Desktop atau Podman
 - Docker Compose
 - 8GB RAM minimum
 - 20GB free disk space
 
-# Optional (for testing)
+# Opsional (untuk testing)
 - PostgreSQL client tools
 - curl, wget
 - watch command
@@ -135,155 +265,126 @@ cd belajar-ha
 
 # Demo 1: Stateless HA
 cd demo-1-stateless-ha
-docker compose -f docker-compose-1.yml up -d
-open http://localhost:8080
-open http://localhost:8404  # HAProxy stats
+# Lihat demo-1-stateless-ha/README.md untuk instruksi detail
 
 # Demo 2: Stateful HA
 cd ../demo-2-stateful-ha
-docker compose up -d
-./test-replication.sh
+# Lihat demo-2-stateful-ha/README.md untuk instruksi detail
 
 # Demo 3: Full Stack HA
 cd ../demo-3-full-stack-ha
-docker compose up -d --build
-sleep 60  # Wait for initialization
-./test-fullstack.sh
-open http://localhost:8080
+# Lihat demo-3-full-stack-ha/README.md dan QUICKSTART.md untuk instruksi detail
 ```
 
 ---
 
-## Learning Path
+## Alur Pembelajaran
 
-### Recommended Workshop Flow
+### Alur Workshop yang Disarankan
 
-#### Session 1: Stateless HA Basics (45 min)
-1. Introduction to HA concepts
-2. Demo 1 Part 1: HAProxy load balancing
-3. Hands-on: Kill Nginx instances, observe failover
-4. Exercise: Modify health check parameters
+#### Sesi 1: Dasar Stateless HA (45 menit)
+1. Pengenalan konsep HA
+2. Demo 1 Part 1: Load balancing HAProxy
+3. Hands-on: Matikan instance Nginx, amati failover
+4. Latihan: Modifikasi parameter health check
 
-#### Session 2: Complete Stateless HA (45 min)
-1. Introduction to VRRP and Virtual IPs
+#### Sesi 2: Stateless HA Lengkap (45 menit)
+1. Pengenalan VRRP dan Virtual IPs
 2. Demo 1 Part 2: Keepalived + HAProxy
-3. Hands-on: Kill HAProxy instances, observe VIP failover
-4. Discussion: Split-brain scenarios
+3. Hands-on: Matikan instance HAProxy, amati failover VIP
+4. Diskusi: Skenario split-brain
 
-#### Break (15 min)
+#### Istirahat (15 menit)
 
-#### Session 3: Stateful HA Introduction (60 min)
-1. Challenges of stateful HA
-2. CAP Theorem basics
-3. Demo 2: PostgreSQL replication setup
-4. Hands-on: Test replication, monitor lag
-5. Exercise: Generate load, observe behavior
+#### Sesi 3: Pengenalan Stateful HA (60 menit)
+1. Tantangan stateful HA
+2. Dasar CAP Theorem
+3. Demo 2: Setup replication PostgreSQL
+4. Hands-on: Test replication, monitoring lag
+5. Latihan: Generate load, amati behavior
 
-#### Session 4: Failover & Advanced Topics (60 min)
-1. Manual failover procedures
-2. Demo 2: Primary failure scenario
-3. Split-brain in databases
-4. Production considerations
-5. Discussion: Automatic failover tools
+#### Sesi 4: Failover & Topik Lanjutan (60 menit)
+1. Prosedur manual failover
+2. Demo 2: Skenario failure primary
+3. Split-brain di database
+4. Pertimbangan production
+5. Diskusi: Tools automatic failover
 
-#### Wrap-up (15 min)
-- Q&A
-- Best practices summary
-- Next steps (Patroni, Kubernetes, Cloud HA)
-
----
-
-## Architecture Overview
-
-### Complete HA Stack
-
-```
-┌─────────────────────────────────────────────────┐
-│            USERS / CLIENTS                      │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│         STATELESS LAYER HA (Demo 1)             │
-│                                                  │
-│    VIP (172.20.0.100) - Keepalived VRRP        │
-│           │                                      │
-│    ┌──────┴───────┐                            │
-│    │              │                             │
-│ ┌──▼────┐    ┌───▼────┐                        │
-│ │HAProxy│    │HAProxy │  (Active-Passive)      │
-│ │Master │    │Backup  │                         │
-│ └──┬────┘    └───┬────┘                        │
-│    │             │                               │
-│    └──────┬──────┘                              │
-│           │                                      │
-│    ┌──────┼──────┐                              │
-│    │      │      │                              │
-│ ┌──▼─┐ ┌─▼──┐ ┌─▼──┐                           │
-│ │Nginx│ │Nginx│ │Nginx│ (Stateless Apps)       │
-│ └──┬─┘ └─┬──┘ └─┬──┘                           │
-└────┼─────┼─────┼───────────────────────────────┘
-     │     │     │
-     └─────┼─────┘
-           │
-┌──────────▼──────────────────────────────────────┐
-│        STATEFUL LAYER HA (Demo 2)               │
-│                                                  │
-│         ┌──────────────┐                        │
-│         │  PostgreSQL  │                        │
-│         │   Primary    │  (Read/Write)          │
-│         └──────┬───────┘                        │
-│                │                                 │
-│        ┌───────┼───────┐                        │
-│        │               │                        │
-│   ┌────▼────┐    ┌────▼────┐                   │
-│   │PostgreSQL│   │PostgreSQL│ (Read-Only)      │
-│   │ Replica1 │   │ Replica2 │                   │
-│   └──────────┘   └──────────┘                   │
-│                                                  │
-│   Streaming Replication (Async)                 │
-└──────────────────────────────────────────────────┘
-```
+#### Penutupan (15 menit)
+- Tanya jawab
+- Ringkasan best practices
+- Langkah selanjutnya (Patroni, Kubernetes, Cloud HA)
 
 ---
 
-## Key Concepts Covered
+## Gambaran Umum Arsitektur
 
-### 1. High Availability Fundamentals
-- **Redundancy**: Multiple instances of each component
-- **Failover**: Automatic switching to backup
-- **Health Checks**: Detecting failures
-- **Load Distribution**: Spreading work across instances
-- **Single Point of Failure (SPOF)**: Eliminating bottlenecks
+Workshop ini mendemonstrasikan HA di tiga layer yang berbeda:
+
+### Progresi Layer
+
+```mermaid
+graph LR
+    Demo1[Demo 1:<br/>Stateless Layer<br/>HAProxy + Nginx]
+    Demo2[Demo 2:<br/>Stateful Layer<br/>PostgreSQL]
+    Demo3[Demo 3:<br/>Full Stack<br/>End-to-End]
+
+    Demo1 -->|Add Database| Demo2
+    Demo2 -->|Add Automation| Demo3
+
+    style Demo1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Demo2 fill:#9cf,stroke:#333,stroke-width:2px
+    style Demo3 fill:#f96,stroke:#333,stroke-width:3px
+```
+
+**Demo 1** fokus pada redundansi load balancer dan scaling aplikasi.
+
+**Demo 2** memperkenalkan replikasi database dan tantangan stateful HA.
+
+**Demo 3** menggabungkan kedua layer dengan orkestrasi automatic failover.
+
+Lihat bagian individual demo di atas untuk diagram arsitektur detail.
+
+---
+
+## Konsep Utama yang Dicakup
+
+### 1. Fundamental High Availability
+- **Redundancy**: Multiple instances dari setiap komponen
+- **Failover**: Switching otomatis ke backup
+- **Health Checks**: Deteksi failure
+- **Load Distribution**: Penyebaran pekerjaan di seluruh instances
+- **Single Point of Failure (SPOF)**: Eliminasi bottleneck
 
 ### 2. Stateless vs Stateful HA
 
-| Aspect | Stateless | Stateful |
+| Aspek | Stateless | Stateful |
 |--------|-----------|----------|
-| **Complexity** | Low | High |
-| **Failover Time** | Fast (< 3s) | Slower (30-60s) |
-| **Data Loss Risk** | None | Possible |
-| **Scaling** | Easy (add instances) | Complex (replication) |
+| **Kompleksitas** | Rendah | Tinggi |
+| **Waktu Failover** | Cepat (< 3s) | Lebih lambat (30-60s) |
+| **Risiko Data Loss** | Tidak ada | Mungkin terjadi |
+| **Scaling** | Mudah (add instances) | Kompleks (replication) |
 | **State Management** | No local state | Must sync state |
-| **Example** | Web servers, API gateways | Databases, caches |
+| **Contoh** | Web servers, API gateways | Databases, caches |
 
-### 3. CAP Theorem (Database Context)
-- **Consistency**: All nodes see same data
-- **Availability**: System responds to requests
-- **Partition Tolerance**: Works despite network issues
+### 3. CAP Theorem (Konteks Database)
+- **Consistency**: Semua node melihat data yang sama
+- **Availability**: Sistem merespons request
+- **Partition Tolerance**: Bekerja meski ada masalah network
 
-**PostgreSQL choice**: CP (Consistency + Partition Tolerance)
-- Prioritizes data consistency
-- May sacrifice availability during network partitions
+**Pilihan PostgreSQL**: CP (Consistency + Partition Tolerance)
+- Memprioritaskan konsistensi data
+- Mungkin mengorbankan availability selama network partition
 
-### 4. Failure Scenarios
-- **Process crash**: Application dies
-- **Host failure**: Server hardware/OS crash
-- **Network partition**: Connectivity loss
-- **Cascading failure**: One failure triggers others
-- **Split-brain**: Multiple nodes think they're primary
+### 4. Skenario Failure
+- **Process crash**: Aplikasi mati
+- **Host failure**: Crash hardware/OS server
+- **Network partition**: Kehilangan konektivitas
+- **Cascading failure**: Satu failure memicu yang lain
+- **Split-brain**: Multiple nodes mengira mereka primary
 
 ### 5. Metrics & SLOs
-- **Uptime**: Percentage of time system is available
+- **Uptime**: Persentase waktu sistem available
 - **MTBF**: Mean Time Between Failures
 - **MTTR**: Mean Time To Recovery
 - **RPO**: Recovery Point Objective (data loss)
@@ -291,27 +392,27 @@ open http://localhost:8080
 
 ---
 
-## Troubleshooting Guide
+## Panduan Troubleshooting
 
-### Common Issues
+### Masalah Umum
 
-#### Port Already in Use
+#### Port Sudah Digunakan
 ```bash
-# Check what's using the port
+# Cek apa yang menggunakan port
 lsof -i :8080
 
-# Kill the process or change port in docker-compose.yml
+# Kill prosesnya atau ubah port di docker-compose.yml
 ```
 
 #### Docker Out of Memory
 ```bash
-# Increase Docker Desktop memory allocation
+# Tambah alokasi memory Docker Desktop
 # Docker Desktop → Settings → Resources → Memory → 8GB minimum
 ```
 
-#### Containers Not Starting
+#### Container Tidak Mau Start
 ```bash
-# Check logs
+# Cek logs
 docker compose logs
 
 # Rebuild images
@@ -321,164 +422,165 @@ docker compose up -d --build
 
 #### Scripts Permission Denied
 ```bash
-# Make scripts executable
+# Buat scripts executable
 chmod +x *.sh
 ```
 
-#### PostgreSQL Replication Not Working
+#### Replikasi PostgreSQL Tidak Bekerja
 ```bash
-# Check logs
+# Cek logs
 docker logs postgres-replica1
 
-# Verify primary is healthy
+# Verifikasi primary sehat
 docker exec postgres-primary pg_isready
 
-# Check replication status
+# Cek status replication
 docker exec postgres-primary psql -U postgres -c "SELECT * FROM pg_stat_replication;"
 ```
 
 ---
 
-## Best Practices for Workshop Facilitators
+## Best Practices untuk Fasilitator Workshop
 
-### Preparation (1 day before)
-- [ ] Test all demos on clean Docker environment
-- [ ] Prepare backup slides explaining concepts
-- [ ] Setup projector/screen sharing
-- [ ] Print command cheat sheets for participants
-- [ ] Verify internet connectivity (for image pulls)
+### Persiapan (1 hari sebelumnya)
+- [ ] Test semua demo di environment Docker yang bersih
+- [ ] Siapkan slide backup untuk menjelaskan konsep
+- [ ] Setup proyektor/screen sharing
+- [ ] Print command cheat sheets untuk peserta
+- [ ] Verifikasi konektivitas internet (untuk pull images)
 
-### During Workshop
-- [ ] Start each demo from scratch (no pre-built containers)
-- [ ] Encourage participants to experiment and break things
-- [ ] Use separate terminals for monitoring vs control
-- [ ] Pause after each failure scenario for discussion
-- [ ] Take questions after each section
+### Selama Workshop
+- [ ] Mulai setiap demo dari awal (tanpa pre-built containers)
+- [ ] Dorong peserta untuk eksperimen dan break things
+- [ ] Gunakan terminal terpisah untuk monitoring vs control
+- [ ] Pause setelah setiap skenario failure untuk diskusi
+- [ ] Terima pertanyaan setelah setiap bagian
 
 ### Tips
-- Use `watch` command for continuous monitoring
-- Open HAProxy stats dashboard on big screen
-- Show both success and failure scenarios
-- Emphasize "break things to learn" mentality
-- Compare costs (resources, complexity) vs benefits
+- Gunakan command `watch` untuk monitoring kontinyu
+- Buka HAProxy stats dashboard di layar besar
+- Tunjukkan skenario sukses dan failure
+- Tekankan mentalitas "break things to learn"
+- Bandingkan costs (resources, kompleksitas) vs benefits
 
 ---
 
-## Advanced Topics (Optional)
+## Topik Lanjutan (Opsional)
 
-### After completing both demos, consider exploring:
+### Setelah menyelesaikan semua demo, pertimbangkan untuk eksplorasi:
 
-#### Automatic Failover Tools
-- **Patroni**: PostgreSQL HA with automatic failover
-- **Consul**: Service discovery and health checking
+#### Tools Automatic Failover
+- **pg_auto_failover**: Automatic failover PostgreSQL (didemonstrasikan di Demo 3)
+- **Patroni**: PostgreSQL HA dengan automatic failover
+- **Consul**: Service discovery dan health checking
 - **etcd**: Distributed configuration store
 
-#### Cloud HA Solutions
+#### Solusi HA Cloud
 - AWS: RDS Multi-AZ, ALB, Auto Scaling
 - GCP: Cloud SQL HA, Cloud Load Balancing
 - DigitalOcean: Managed Databases, Load Balancers
 
 #### Kubernetes HA
-- ReplicaSets for stateless apps
-- StatefulSets for stateful apps
+- ReplicaSets untuk stateless apps
+- StatefulSets untuk stateful apps
 - Service mesh (Istio, Linkerd)
 
 #### Monitoring & Alerting
 - Prometheus + Grafana
 - ELK Stack
-- PagerDuty integration
+- Integrasi PagerDuty
 
 ---
 
-## Production Checklist
+## Checklist Production
 
-When implementing HA in production:
+Saat mengimplementasikan HA di production:
 
 ### Infrastructure
 - [ ] Multiple availability zones/regions
 - [ ] Automated backups
 - [ ] Disaster recovery plan
-- [ ] Network redundancy
-- [ ] Power redundancy
+- [ ] Redundansi network
+- [ ] Redundansi power
 
-### Application
+### Aplikasi
 - [ ] Health check endpoints
 - [ ] Graceful shutdown
 - [ ] Connection retry logic
 - [ ] Circuit breakers
-- [ ] Timeout configurations
+- [ ] Konfigurasi timeout
 
 ### Database
-- [ ] Replication lag monitoring
-- [ ] Automated failover testing
-- [ ] Backup verification
-- [ ] Data corruption detection
-- [ ] Point-in-time recovery capability
+- [ ] Monitoring replication lag
+- [ ] Testing automated failover
+- [ ] Verifikasi backup
+- [ ] Deteksi data corruption
+- [ ] Kapabilitas point-in-time recovery
 
 ### Monitoring
-- [ ] Uptime monitoring
+- [ ] Monitoring uptime
 - [ ] Performance metrics
-- [ ] Error rate tracking
+- [ ] Tracking error rate
 - [ ] Capacity planning
 - [ ] Alert escalation policies
 
-### Procedures
-- [ ] Runbooks for common failures
-- [ ] Regular failover drills
+### Prosedur
+- [ ] Runbooks untuk failure umum
+- [ ] Failover drills reguler
 - [ ] Incident response plan
-- [ ] Post-mortem process
-- [ ] Documentation updates
+- [ ] Proses post-mortem
+- [ ] Update dokumentasi
 
 ---
 
-## Cost Considerations
+## Pertimbangan Biaya
 
-### Demo 1 Resources
+### Resource Demo 1
 - CPU: 2 cores
 - RAM: 2GB
 - Storage: 1GB
-- **Cost**: ~$20/month (single DigitalOcean droplet)
+- **Biaya**: ~$20/bulan (single DigitalOcean droplet)
 
-### Demo 2 Resources
+### Resource Demo 2
 - CPU: 4 cores
 - RAM: 4GB
 - Storage: 20GB
-- **Cost**: ~$40/month (single DigitalOcean droplet)
+- **Biaya**: ~$40/bulan (single DigitalOcean droplet)
 
-### Production HA (Typical)
+### Production HA (Tipikal)
 - Multiple regions: 2-3x base cost
-- Redundant components: 2-3x resource cost
-- Monitoring infrastructure: +20% cost
-- **Total multiplier**: 4-6x single instance cost
+- Komponen redundan: 2-3x resource cost
+- Infrastruktur monitoring: +20% cost
+- **Total multiplier**: 4-6x biaya single instance
 
-**Trade-off**: Higher cost for better availability
+**Trade-off**: Biaya lebih tinggi untuk availability yang lebih baik
 
 ---
 
-## Success Criteria
+## Kriteria Sukses
 
-By the end of this workshop, participants should be able to:
+Di akhir workshop ini, peserta harus dapat:
 
-### Understanding
-- [ ] Explain difference between stateless and stateful HA
-- [ ] Describe how load balancing works
-- [ ] Understand replication concepts
-- [ ] Identify single points of failure
-- [ ] Calculate availability percentages
+### Pemahaman
+- [ ] Menjelaskan perbedaan stateless dan stateful HA
+- [ ] Mendeskripsikan cara kerja load balancing
+- [ ] Memahami konsep replikasi
+- [ ] Mengidentifikasi single points of failure
+- [ ] Menghitung persentase availability
 
-### Skills
+### Keterampilan
 - [ ] Setup basic load balancer
-- [ ] Configure health checks
-- [ ] Deploy PostgreSQL replication
-- [ ] Perform manual failover
-- [ ] Monitor system health
+- [ ] Konfigurasi health checks
+- [ ] Deploy replikasi PostgreSQL
+- [ ] Melakukan manual failover
+- [ ] Monitoring kesehatan sistem
 
-### Application
-- [ ] Design HA architecture for simple app
-- [ ] Choose appropriate HA strategy
-- [ ] Estimate HA costs and benefits
-- [ ] Write basic runbooks
-- [ ] Plan disaster recovery
+### Aplikasi
+- [ ] Mendesain arsitektur HA untuk aplikasi sederhana
+- [ ] Memilih strategi HA yang sesuai
+- [ ] Estimasi biaya dan benefit HA
+- [ ] Menulis runbooks dasar
+- [ ] Merencanakan disaster recovery
 
 ---
 
@@ -512,19 +614,19 @@ Dokumentasi ini mencakup:
 
 ---
 
-## Additional Resources
+## Sumber Belajar Tambahan
 
-### Documentation
+### Dokumentasi
 - [HAProxy Best Practices](http://www.haproxy.org/#docs)
 - [PostgreSQL HA Documentation](https://www.postgresql.org/docs/current/high-availability.html)
 - [VRRP RFC 5798](https://tools.ietf.org/html/rfc5798)
 
-### Books
+### Buku
 - "Site Reliability Engineering" (Google)
 - "Database Reliability Engineering" (O'Reilly)
 - "The Art of Capacity Planning" (O'Reilly)
 
-### Online Courses
+### Kursus Online
 - Linux Academy: HA and Fault Tolerance
 - Udemy: PostgreSQL High Availability
 - Coursera: Cloud Computing Specialization
@@ -536,26 +638,25 @@ Dokumentasi ini mencakup:
 
 ---
 
-## Feedback & Improvements
+## Feedback & Perbaikan
 
-This workshop material is continuously improved. Feedback welcome:
+Materi workshop ini terus ditingkatkan. Feedback sangat diterima:
 
-- GitHub Issues: [Repository issues](https://github.com/your-repo)
-- Email: [your-email]
-- Slack: [your-slack-channel]
+- GitHub Issues: [Repository issues](https://github.com/endymuhardin/training-sre-junior-2025-02)
+- Email: [endy.muhardin@gmail.com]
 
 ---
 
-## License
+## Lisensi
 
-These workshop materials are provided for educational purposes.
+Materi workshop ini disediakan untuk tujuan edukasi.
 
 ---
 
 ## Credits
 
-Created for SRE Junior Training 2025 - Batch 2
+Dibuat untuk SRE Junior Training 2025 - Batch 2
 
-**Author**: [Your Name]
+**Author**: [Endy Muhardin]
 **Last Updated**: 2025-11-07
 **Version**: 1.0

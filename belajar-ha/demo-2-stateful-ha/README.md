@@ -6,23 +6,24 @@ Demonstrasi High Availability pada stateful layer menggunakan PostgreSQL Streami
 
 ## Arsitektur
 
-```
-     ┌────────────────────────┐
-     │   PostgreSQL Primary   │  ◄───┐
-     │      Read/Write        │      │
-     │      Port 5432         │      │ Streaming
-     └──────────┬─────────────┘      │ Replication
-                │                    │
-                │ Reads              │
-                │                    │
-            ┌───▼────┐               │
-            │Replica1│───────────────┘
-            │  Read  │
-            │  5433  │
-            └────────┘
+```mermaid
+graph TB
+    Client[Client/Application<br/>psql, Direct Connection]
 
-         Physical Replication
-          (WAL Streaming)
+    Primary[PostgreSQL Primary<br/>Read/Write<br/>:5432]
+    Replica1[PostgreSQL Replica 1<br/>Read Only<br/>:5433]
+    Replica2[PostgreSQL Replica 2<br/>Read Only<br/>:5434]
+
+    Client -->|Write| Primary
+    Client -->|Read| Replica1
+    Client -->|Read| Replica2
+
+    Primary -->|Streaming<br/>Replication<br/>WAL Streaming| Replica1
+    Primary -->|Streaming<br/>Replication<br/>WAL Streaming| Replica2
+
+    style Primary fill:#f96,stroke:#333,stroke-width:3px
+    style Replica1 fill:#9cf,stroke:#333,stroke-width:2px
+    style Replica2 fill:#9cf,stroke:#333,stroke-width:2px
 ```
 
 ## Konsep HA yang Didemonstrasikan
