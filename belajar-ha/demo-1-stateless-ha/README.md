@@ -65,6 +65,367 @@ Demonstrasi High Availability pada stateless layer menggunakan HAProxy dan Nginx
 - **Automatic Promotion**: Backup menjadi master saat master down
 - **Split-Brain Prevention**: Authentication dan priority
 
+---
+
+## Cara Kerja Failover: Deep Dive
+
+### 1. HAProxy Health Check: Deteksi Node Failure
+
+HAProxy secara aktif memonitor kesehatan backend server untuk mendeteksi kegagalan dan secara otomatis menghapus instance yang gagal dari pool.
+
+#### Konfigurasi di `haproxy.cfg`
+
+**Backend Configuration (haproxy.cfg:45-52)**:
+```haproxy
+backend nginx_backend
+    balance roundrobin
+    option httpchk GET /
+    http-check expect status 200
+
+    server nginx1 nginx1:80 check inter 2s fall 3 rise 2 resolvers docker init-addr libc,none
+    server nginx2 nginx2:80 check inter 2s fall 3 rise 2 resolvers docker init-addr libc,none
+    server nginx3 nginx3:80 check inter 2s fall 3 rise 2 resolvers docker init-addr libc,none
+```
+
+#### Parameter Health Check:
+
+| Parameter | Lokasi | Nilai | Fungsi |
+|-----------|--------|-------|--------|
+| `option httpchk GET /` | haproxy.cfg:47 | GET request ke root path | Tipe health check yang digunakan |
+| `http-check expect status 200` | haproxy.cfg:48 | HTTP 200 OK | Response yang dianggap sehat |
+| `check` | haproxy.cfg:50-52 | flag | Aktifkan health checking untuk server ini |
+| `inter 2s` | haproxy.cfg:50-52 | 2 detik | Interval antara health check |
+| `fall 3` | haproxy.cfg:50-52 | 3 kali gagal | Mark server DOWN setelah 3 check gagal berturut-turut |
+| `rise 2` | haproxy.cfg:50-52 | 2 kali sukses | Mark server UP setelah 2 check sukses berturut-turut |
+| `timeout check 10000ms` | haproxy.cfg:28 | 10 detik | Timeout untuk health check response |
+
+#### Mekanisme Deteksi:
+
+**Normal Flow**:
+```
+Setiap 2 detik → HAProxy kirim GET / → Backend respond 200 OK → Mark sebagai UP
+```
+
+**Failure Detection**:
+```
+T=0s:  HAProxy → GET / → nginx1 (timeout/error)     [Check #1 failed]
+T=2s:  HAProxy → GET / → nginx1 (timeout/error)     [Check #2 failed]
+T=4s:  HAProxy → GET / → nginx1 (timeout/error)     [Check #3 failed]
+T=4s:  nginx1 marked as DOWN
+       Traffic dialihkan ke nginx2 dan nginx3 saja
+```
+
+**Recovery Detection**:
+```
+T=6s:  HAProxy → GET / → nginx1 (200 OK)            [Check #1 success]
+T=8s:  HAProxy → GET / → nginx1 (200 OK)            [Check #2 success]
+T=8s:  nginx1 marked as UP
+       Traffic kembali di-distribute ke nginx1, nginx2, nginx3
+```
+
+#### Kenapa HAProxy Bisa Deteksi?
+
+1. **Active Probing**: HAProxy tidak pasif menunggu error dari client request, tapi **aktif** mengirim health check request setiap `inter 2s`
+2. **Isolated Health Checks**: Health check berjalan independent dari client traffic, jadi tidak mengganggu user
+3. **Fail-Fast Mechanism**: Dengan `fall 3` dan `inter 2s`, detection time maksimal = **6 detik** (3 × 2s)
+4. **Prevent Flapping**: `rise 2` mencegah backend yang tidak stabil masuk-keluar pool terlalu cepat
+
+#### Tuning Parameters:
+
+**Faster Detection (aggressive)**:
+```haproxy
+server nginx1 nginx1:80 check inter 1s fall 2 rise 2
+# Detection time: 2 detik (2 × 1s)
+# Trade-off: Lebih banyak health check traffic
+```
+
+**Slower Detection (conservative)**:
+```haproxy
+server nginx1 nginx1:80 check inter 5s fall 5 rise 3
+# Detection time: 25 detik (5 × 5s)
+# Trade-off: Backend mati lebih lama sebelum terdeteksi
+```
+
+#### Observasi Real-time:
+
+**Lihat Status Health Check**:
+```bash
+# Via stats dashboard
+curl http://localhost:8404/ | grep -A5 "nginx1"
+
+# Via HAProxy socket
+echo "show stat" | socat stdio /var/run/haproxy.sock | grep nginx1
+```
+
+**Output Example**:
+```
+nginx1: status=UP, check_status=L7OK, check_duration=2ms, last_chg=15s
+```
+
+---
+
+### 2. Keepalived VIP Failover: Deteksi HAProxy Failure
+
+Keepalived menggunakan **VRRP protocol** untuk manage Virtual IP dan melakukan failover ketika HAProxy master instance gagal.
+
+#### Konfigurasi Master (`keepalived-master.conf`)
+
+**VRRP Script - Health Check (keepalived-master.conf:6-11)**:
+```bash
+vrrp_script check_haproxy {
+    script "/usr/bin/killall -0 haproxy"
+    interval 2
+    weight 2
+    user root
+}
+```
+
+**VRRP Instance Configuration (keepalived-master.conf:13-32)**:
+```bash
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    virtual_router_id 51
+    priority 100
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+
+    virtual_ipaddress {
+        172.20.0.100/16
+    }
+
+    track_script {
+        check_haproxy
+    }
+}
+```
+
+#### Konfigurasi Backup (`keepalived-backup.conf`)
+
+Identik dengan master kecuali:
+- `state BACKUP` (keepalived-backup.conf:14)
+- `priority 90` (keepalived-backup.conf:17) - **lebih rendah** dari master (100)
+
+#### Parameter VRRP:
+
+| Parameter | Lokasi | Nilai | Fungsi |
+|-----------|--------|-------|--------|
+| `script "/usr/bin/killall -0 haproxy"` | keepalived-master.conf:7 | Check process HAProxy | Command untuk cek apakah HAProxy running |
+| `interval 2` | keepalived-master.conf:8 | 2 detik | Jalankan health check setiap 2 detik |
+| `weight 2` | keepalived-master.conf:9 | Priority adjustment | Kurangi priority 2 poin jika check gagal |
+| `state MASTER` | keepalived-master.conf:14 | Initial state | Node ini start sebagai MASTER |
+| `priority 100` | keepalived-master.conf:17 | Priority value | Master punya priority lebih tinggi (100 vs 90) |
+| `advert_int 1` | keepalived-master.conf:18 | 1 detik | Broadcast VRRP advertisement setiap 1 detik |
+| `virtual_router_id 51` | keepalived-master.conf:16 | ID unik | Identify VRRP group (harus sama di master/backup) |
+| `virtual_ipaddress` | keepalived-master.conf:25-27 | 172.20.0.100/16 | VIP yang akan di-manage |
+| `authentication` | keepalived-master.conf:20-23 | Password | Prevent rogue nodes join VRRP group |
+
+#### Mekanisme Health Check:
+
+**Command: `killall -0 haproxy`**
+- Flag `-0` = "send signal 0" = **check if process exists WITHOUT killing it**
+- Exit code 0 = process running (healthy)
+- Exit code non-zero = process not found (unhealthy)
+
+**Health Check Flow**:
+```
+Setiap 2 detik:
+  Keepalived → Execute: killall -0 haproxy
+
+  Case 1 - HAProxy Running:
+    Command returns: exit code 0
+    Priority remains: 100 (master) or 90 (backup)
+
+  Case 2 - HAProxy Dead:
+    Command returns: exit code 1
+    Priority reduced by weight: 100 - 2 = 98 atau 90 - 2 = 88
+```
+
+#### Mekanisme VIP Failover:
+
+**Normal State (Master Active)**:
+```
+haproxy1 (MASTER):
+  - Priority: 100
+  - HAProxy: running ✓
+  - VIP 172.20.0.100: ASSIGNED to eth0
+  - Broadcast VRRP advertisement setiap 1s: "I am MASTER with priority 100"
+
+haproxy2 (BACKUP):
+  - Priority: 90
+  - HAProxy: running ✓
+  - VIP 172.20.0.100: NOT assigned
+  - Listening to VRRP advertisements dari master
+```
+
+**Failover Trigger - Master HAProxy Crashes**:
+```
+T=0s:  haproxy1 process crash
+
+T=0s:  Keepalived on haproxy1 runs check:
+       killall -0 haproxy → exit code 1 (failed)
+       Priority: 100 - 2 = 98
+
+T=0s:  haproxy1 still sends VRRP advertisement:
+       "I am MASTER with priority 98"
+
+T=0s:  haproxy2 receives advertisement:
+       "Master priority 98 < My priority 90"
+       Wait... ini tidak trigger failover karena 98 > 90!
+
+       ❌ TAPI, konfigurasi current punya masalah!
+```
+
+**⚠️ PENTING - Konfigurasi Weight Problem**:
+
+Dengan weight=2 dan priority 100 vs 90:
+- Master dengan HAProxy mati: priority 98
+- Backup dengan HAProxy sehat: priority 90
+- **98 > 90** = Master tetap pegang VIP meskipun HAProxy mati!
+
+**Konfigurasi yang Benar - Set Weight Lebih Besar**:
+```bash
+vrrp_script check_haproxy {
+    script "/usr/bin/killall -0 haproxy"
+    interval 2
+    weight -20   # Kurangi priority 20 (lebih dari selisih master-backup)
+    user root
+}
+```
+
+**Dengan weight=-20, Failover Flow Correct**:
+```
+T=0s:  haproxy1 HAProxy crash
+       Keepalived detects: killall -0 haproxy → failed
+       Priority: 100 - 20 = 80
+
+T=1s:  haproxy1 broadcast: "MASTER with priority 80"
+       haproxy2 receives: "Master=80, Me=90"
+       haproxy2: "My priority is higher! I'll become MASTER"
+
+T=1s:  haproxy2 transition to MASTER:
+       1. Stop listening to advertisements
+       2. Send Gratuitous ARP untuk 172.20.0.100
+       3. Assign VIP ke eth0
+       4. Start sending advertisements: "I am MASTER with priority 90"
+
+T=2s:  haproxy1 receives advertisement dari haproxy2:
+       "New MASTER with priority 90 > my priority 80"
+       haproxy1 → Transition to BACKUP
+       Remove VIP dari eth0
+
+T=2s:  VIP 172.20.0.100 sekarang di haproxy2
+       Traffic flows through haproxy2
+```
+
+**Gratuitous ARP**:
+- Ketika VIP berpindah, network switches perlu update ARP table
+- New master send **Gratuitous ARP**: "MAC address for 172.20.0.100 is now MY MAC"
+- Switches update forwarding table instantly
+- Clients di-redirect ke new master dalam < 1 detik
+
+#### Mekanisme Split-Brain Prevention:
+
+**Authentication (keepalived-master.conf:20-23)**:
+```bash
+authentication {
+    auth_type PASS
+    auth_pass 1234
+}
+```
+
+- Semua VRRP advertisements include authentication hash
+- Hanya nodes dengan `auth_pass` yang sama bisa join group
+- Prevent rogue container accidentally claim VIP
+
+**Virtual Router ID (keepalived-master.conf:16)**:
+```bash
+virtual_router_id 51
+```
+
+- Harus **identik** di semua nodes dalam VRRP group
+- Nodes dengan `virtual_router_id` berbeda = different group
+- Prevent collision jika ada multiple VRRP setup di network yang sama
+
+**Priority-based Election**:
+- Higher priority always wins
+- Jika priority sama, higher IP address wins (deterministic)
+- No "dual master" state possible dalam protocol
+
+#### Detection Timing:
+
+**Best Case (Process Crash)**:
+```
+Master HAProxy crash → Keepalived detect dalam 2s → Backup receive advertisement dalam 1s
+Total failover time: ~3 detik
+```
+
+**Worst Case (Network Partition)**:
+```
+Master network disconnect → Backup tidak receive advertisement
+Timeout: advert_int × 3 = 1s × 3 = 3s
+Backup promote to master: ~3-4 detik
+```
+
+#### Observasi Real-time:
+
+**Check VIP Ownership**:
+```bash
+# Pada master
+docker exec haproxy1 ip addr show eth0 | grep 172.20.0.100
+# Output: inet 172.20.0.100/16 scope global secondary eth0
+
+# Pada backup
+docker exec haproxy2 ip addr show eth0 | grep 172.20.0.100
+# Output: (empty - VIP tidak ada)
+```
+
+**Monitor VRRP State**:
+```bash
+# Check keepalived logs
+docker logs haproxy1 2>&1 | grep -i vrrp
+docker logs haproxy2 2>&1 | grep -i vrrp
+
+# Output example:
+# Keepalived_vrrp[1]: VRRP_Instance(VI_1) Transition to MASTER STATE
+# Keepalived_vrrp[1]: VRRP_Instance(VI_1) Entering MASTER STATE
+```
+
+---
+
+### 3. Multi-Layer Failover: HAProxy + Keepalived
+
+Kombinasi HAProxy health check dan Keepalived VRRP membuat **2 level redundancy**:
+
+**Level 1: Backend Failure (HAProxy Handle)**
+```
+nginx1 crash → HAProxy detect dalam 6s → Remove dari pool
+Traffic ke nginx2 dan nginx3 → HAProxy tetap up
+Keepalived tidak trigger failover (HAProxy masih running)
+```
+
+**Level 2: Load Balancer Failure (Keepalived Handle)**
+```
+haproxy1 crash → Keepalived detect dalam 2s → VIP move ke haproxy2
+haproxy2 takes over → Traffic continues through haproxy2
+Backend health checks continue normally
+```
+
+**Resilience Matrix**:
+
+| Failure Scenario | Detection Time | Service Impact | Recovery Mechanism |
+|-----------------|----------------|----------------|-------------------|
+| 1 backend down | 6s | None - traffic redistributed | HAProxy health check |
+| 2 backends down | 6s | None - traffic to remaining 1 | HAProxy health check |
+| All backends down | 6s | 503 Service Unavailable | Manual intervention required |
+| Master HAProxy down | 3s | 1-2 lost requests | Keepalived VIP failover |
+| Both HAProxy down | 3s | Total outage | Manual restart required |
+| Network partition | 3s | Potential split-brain | VRRP authentication prevents |
+
 ### Shared Configuration
 - Kedua part menggunakan **`haproxy.cfg` yang sama**
 - Konfigurasi DNS resolver mendukung network dari kedua compose file
