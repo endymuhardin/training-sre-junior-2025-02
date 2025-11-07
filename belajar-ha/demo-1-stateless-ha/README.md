@@ -23,7 +23,12 @@ Demonstrasi High Availability pada stateless layer menggunakan HAProxy dan Nginx
 
 ### Part 2: Full Stack HA (docker-compose-2.yml)
 ```
-     ┌──────────────────────────────┐
+     ┌──────────────────────────┐
+     │   vip-access (nginx)     │  ⚠️ DEMO ONLY - SPOF!
+     │   localhost:8080         │     (Tidak ada di production)
+     └──────────────┬───────────┘
+                    │
+     ┌──────────────▼───────────────┐
      │    Virtual IP (172.20.0.100) │
      │         Keepalived           │
      └───────────────┬──────────────┘
@@ -188,6 +193,99 @@ podman compose -f docker-compose-1.yml down
 > - Part 2 menggunakan haproxy.cfg yang sama dengan Part 1, sehingga semua catatan tentang [Container Runtime Quirks](#container-runtime-quirks) juga berlaku di sini
 > - Konfigurasi sudah disesuaikan untuk mendukung kedua network (compose-1 dan compose-2)
 > - **Jangan jalankan Part 1 dan Part 2 bersamaan** - pilih salah satu
+
+### ⚠️ Catatan Penting: vip-access Container (Demo Limitation)
+
+**DISCLAIMER**: Setup ini menggunakan container `vip-access` sebagai **workaround untuk demo** yang **BUKAN** arsitektur production.
+
+#### Mengapa vip-access Ada?
+
+```
+Host Machine (localhost:8080)
+        ↓
+   [vip-access] ← SINGLE POINT OF FAILURE!
+        ↓
+   172.20.0.100 (VIP - internal container network)
+        ↓
+   [haproxy1] ↔ [haproxy2] (HA Pair)
+        ↓
+   [nginx1, nginx2, nginx3]
+```
+
+**Masalah**: Virtual IP `172.20.0.100` hanya ada di **internal Docker/Podman network**. Host machine tidak bisa langsung akses IP yang ada di dalam container network.
+
+**Solusi Demo**: Container `vip-access` bertindak sebagai proxy/bridge:
+- Expose port ke host (`localhost:8080`)
+- Forward request ke VIP (`172.20.0.100:80`)
+- Ini memudahkan testing dari browser
+
+**Konsekuensi**: `vip-access` adalah **SPOF** - jika container ini mati, seluruh sistem tidak accessible meskipun HAProxy HA masih bekerja dengan baik.
+
+#### Bagaimana di Production?
+
+Di production, **vip-access tidak diperlukan** karena VIP langsung accessible:
+
+**1. Bare Metal / Virtual Machines**:
+```
+Internet / Internal Network
+        ↓
+   172.20.0.100 (VIP di physical network interface)
+        ↓
+   [HAProxy1] ↔ [HAProxy2]
+        ↓
+   [App Servers]
+```
+- VIP adalah IP address nyata di network card
+- Client langsung akses ke VIP tanpa proxy
+- Keepalived manage VIP migration antar server
+
+**2. Cloud Environment (AWS/GCP/Azure)**:
+```
+Internet
+        ↓
+   Elastic Load Balancer / Cloud Load Balancer
+        ↓
+   [HAProxy1] ↔ [HAProxy2]
+        ↓
+   [App Servers]
+```
+- Cloud provider punya native HA load balancer
+- Atau gunakan Elastic IP yang bisa di-reassign
+
+**3. Kubernetes**:
+```
+Internet
+        ↓
+   Ingress Controller / LoadBalancer Service
+        ↓
+   [App Pods - multiple replicas]
+```
+- Kubernetes Service abstraction handle load balancing
+- Ingress controller untuk external access
+
+#### Testing Tanpa vip-access
+
+Jika ingin test dengan arsitektur yang lebih akurat (tanpa SPOF), test dari dalam network:
+
+```bash
+# Test dari container lain di network yang sama
+podman exec nginx1 curl http://172.20.0.100
+
+# Test failover
+podman stop haproxy1
+sleep 5
+podman exec nginx1 curl http://172.20.0.100  # Masih jalan via haproxy2
+
+# Test VIP ownership
+podman exec haproxy1 ip addr show eth0 | grep 172.20.0.100
+podman exec haproxy2 ip addr show eth0 | grep 172.20.0.100
+```
+
+#### Kesimpulan
+
+- ✅ **Untuk demo/learning**: vip-access memudahkan observasi dari browser
+- ❌ **Untuk production**: vip-access adalah anti-pattern, gunakan solusi native platform
+- 📚 **Pembelajaran utama**: Fokus ke mekanisme VIP failover antara haproxy1 ↔ haproxy2, bukan arsitektur keseluruhan
 
 ### 1. Jalankan Environment
 
@@ -548,6 +646,32 @@ curl http://localhost:8404
 
 ## Production Considerations
 
+### Deployment Architecture
+
+**⚠️ PENTING**: Setup demo menggunakan `vip-access` container yang **TIDAK boleh** digunakan di production.
+
+**Production Deployment Options**:
+
+1. **Bare Metal / VM**:
+   - VIP langsung di network interface fisik
+   - Client akses langsung ke VIP (no proxy)
+   - Keepalived handle VIP migration
+
+2. **Cloud (AWS/GCP/Azure)**:
+   - Gunakan native load balancer (ELB, Cloud LB)
+   - Atau Elastic IP / Floating IP yang bisa di-reassign
+   - HAProxy di belakang cloud LB untuk advanced routing
+
+3. **Kubernetes**:
+   - LoadBalancer Service atau Ingress Controller
+   - Multiple HAProxy pods dengan anti-affinity
+   - Service mesh (Istio, Linkerd) untuk advanced scenarios
+
+4. **Hybrid**:
+   - BGP Anycast untuk multi-datacenter
+   - DNS-based failover sebagai backup
+   - GeoDNS untuk global load distribution
+
 ### HAProxy Best Practices
 - Use `option redispatch` untuk retry pada server lain
 - Set appropriate `timeout` values (especially `timeout check` for health checks)
@@ -561,6 +685,7 @@ curl http://localhost:8404
 - Strong `auth_pass` di production
 - Monitor keepalived logs
 - Test failover regularly
+- **NEVER** gunakan proxy/bridge di depan VIP (creates SPOF)
 
 ### Monitoring
 - Integrate dengan Prometheus HAProxy exporter
