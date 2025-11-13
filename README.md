@@ -12,3 +12,6 @@
 
 **Gambar Hari 4**
 [![Gambar Hari 4](./gambar/materi-sre-hari-4.svg)](./gambar/materi-sre-hari-4.svg)
+
+**Gambar Hari 5**
+[![Gambar Hari 5](./gambar/materi-sre-hari-5.svg)](./gambar/materi-sre-hari-5.svg)
